@@ -52,11 +52,11 @@ class _HomePageState extends State<HomePage> {
   bool get _hasSelection => _selectedDraft != null;
 
   bool get _isRuntimeLocked => const <String>{
-    'starting',
-    'stopping',
-    'running',
-    'running-dry',
-  }.contains(_status);
+        'starting',
+        'stopping',
+        'running',
+        'running-dry',
+      }.contains(_status);
 
   @override
   void initState() {
@@ -88,6 +88,7 @@ class _HomePageState extends State<HomePage> {
         });
       },
     );
+    _initializeRuntimeBridge();
     _restoreNodeCollection();
   }
 
@@ -111,21 +112,32 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Future<void> _initializeRuntimeBridge() async {
+    try {
+      await _runtimeBridge.initialize();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _logLines.insert(0, 'runtime-init-error: $error');
+      });
+    }
+  }
+
   RuntimeMode _defaultRuntimeMode() {
     return _runtimeBridge.normalizeRuntimeMode(RuntimeMode.vpn);
   }
 
   List<StoredNodeDraft> _normalizeNodes(List<StoredNodeDraft> nodes) {
-    return nodes
-        .map((StoredNodeDraft draft) {
-          final RuntimeMode normalizedMode = _runtimeBridge
-              .normalizeRuntimeMode(draft.runtimeMode);
-          if (normalizedMode == draft.runtimeMode) {
-            return draft;
-          }
-          return draft.copyWith(runtimeMode: normalizedMode);
-        })
-        .toList(growable: false);
+    return nodes.map((StoredNodeDraft draft) {
+      final RuntimeMode normalizedMode =
+          _runtimeBridge.normalizeRuntimeMode(draft.runtimeMode);
+      if (normalizedMode == draft.runtimeMode) {
+        return draft;
+      }
+      return draft.copyWith(runtimeMode: normalizedMode);
+    }).toList(growable: false);
   }
 
   Profile _buildProfileFromDraft(StoredNodeDraft draft) {
@@ -911,26 +923,25 @@ class _HomePageState extends State<HomePage> {
                   child: const Text('手动输入 / 编辑'),
                 ),
               ],
-              builder:
-                  (
-                    BuildContext context,
-                    MenuController controller,
-                    Widget? child,
-                  ) {
-                    return FilledButton.icon(
-                      onPressed: _isRuntimeLocked
-                          ? null
-                          : () {
-                              if (controller.isOpen) {
-                                controller.close();
-                              } else {
-                                controller.open();
-                              }
-                            },
-                      icon: const Icon(Icons.add_link_outlined),
-                      label: const Text('导入节点'),
-                    );
-                  },
+              builder: (
+                BuildContext context,
+                MenuController controller,
+                Widget? child,
+              ) {
+                return FilledButton.icon(
+                  onPressed: _isRuntimeLocked
+                      ? null
+                      : () {
+                          if (controller.isOpen) {
+                            controller.close();
+                          } else {
+                            controller.open();
+                          }
+                        },
+                  icon: const Icon(Icons.add_link_outlined),
+                  label: const Text('导入节点'),
+                );
+              },
             ),
             const SizedBox(height: 16),
             if (_savedNodes.isEmpty)
@@ -970,9 +981,8 @@ class _HomePageState extends State<HomePage> {
     final bool isSelected = draft.id == _selectedNodeId;
 
     return Material(
-      color: isSelected
-          ? colors.secondaryContainer
-          : colors.surfaceContainerLow,
+      color:
+          isSelected ? colors.secondaryContainer : colors.surfaceContainerLow,
       borderRadius: BorderRadius.circular(22),
       child: InkWell(
         borderRadius: BorderRadius.circular(22),
@@ -993,9 +1003,8 @@ class _HomePageState extends State<HomePage> {
                       isSelected
                           ? Icons.radio_button_checked
                           : Icons.radio_button_off_outlined,
-                      color: isSelected
-                          ? colors.primary
-                          : colors.onSurfaceVariant,
+                      color:
+                          isSelected ? colors.primary : colors.onSurfaceVariant,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -1034,15 +1043,15 @@ class _HomePageState extends State<HomePage> {
                     },
                     itemBuilder: (BuildContext context) =>
                         <PopupMenuEntry<_NodeItemAction>>[
-                          const PopupMenuItem<_NodeItemAction>(
-                            value: _NodeItemAction.edit,
-                            child: Text('编辑'),
-                          ),
-                          const PopupMenuItem<_NodeItemAction>(
-                            value: _NodeItemAction.delete,
-                            child: Text('删除'),
-                          ),
-                        ],
+                      const PopupMenuItem<_NodeItemAction>(
+                        value: _NodeItemAction.edit,
+                        child: Text('编辑'),
+                      ),
+                      const PopupMenuItem<_NodeItemAction>(
+                        value: _NodeItemAction.delete,
+                        child: Text('删除'),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1214,9 +1223,8 @@ class _HomePageState extends State<HomePage> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: _hasSelection && !_isRuntimeLocked
-                    ? _startRuntime
-                    : null,
+                onPressed:
+                    _hasSelection && !_isRuntimeLocked ? _startRuntime : null,
                 icon: const Icon(Icons.shield_outlined),
                 label: const Text('启动连接'),
               ),
@@ -1243,12 +1251,11 @@ class _HomePageState extends State<HomePage> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed:
-                    const <String>{
-                      'starting',
-                      'running',
-                      'running-dry',
-                    }.contains(_status)
+                onPressed: const <String>{
+                  'starting',
+                  'running',
+                  'running-dry',
+                }.contains(_status)
                     ? _stopRuntime
                     : null,
                 icon: const Icon(Icons.stop_circle_outlined),
@@ -1579,11 +1586,9 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
     final bool showTlsFields = _selectedSecurity.toLowerCase() == 'tls';
     final bool showXhttpFields = _selectedNetwork.toLowerCase() == 'xhttp';
     final bool showDownloadSection = _enableDownloadSettings && showXhttpFields;
-    final bool showDownloadSecurityFields =
-        showDownloadSection &&
+    final bool showDownloadSecurityFields = showDownloadSection &&
         _selectedDownloadSecurity.toLowerCase() != 'none';
-    final bool showDownloadRealityFields =
-        showDownloadSection &&
+    final bool showDownloadRealityFields = showDownloadSection &&
         _selectedDownloadSecurity.toLowerCase() == 'reality';
     final bool showDownloadTlsFields =
         showDownloadSection && _selectedDownloadSecurity.toLowerCase() == 'tls';
@@ -1702,9 +1707,9 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
                                     .map(
                                       (String value) =>
                                           DropdownMenuItem<String>(
-                                            value: value,
-                                            child: Text(value.toUpperCase()),
-                                          ),
+                                        value: value,
+                                        child: Text(value.toUpperCase()),
+                                      ),
                                     )
                                     .toList(),
                                 onChanged: (String? value) {
@@ -1730,9 +1735,9 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
                                     .map(
                                       (String value) =>
                                           DropdownMenuItem<String>(
-                                            value: value,
-                                            child: Text(value.toUpperCase()),
-                                          ),
+                                        value: value,
+                                        child: Text(value.toUpperCase()),
+                                      ),
                                     )
                                     .toList(),
                                 onChanged: (String? value) {
@@ -1957,11 +1962,11 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
                                         .map(
                                           (String value) =>
                                               DropdownMenuItem<String>(
-                                                value: value,
-                                                child: Text(
-                                                  value.toUpperCase(),
-                                                ),
-                                              ),
+                                            value: value,
+                                            child: Text(
+                                              value.toUpperCase(),
+                                            ),
+                                          ),
                                         )
                                         .toList(),
                                     onChanged: (String? value) {
@@ -1983,11 +1988,11 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
                                         .map(
                                           (String value) =>
                                               DropdownMenuItem<String>(
-                                                value: value,
-                                                child: Text(
-                                                  value.toUpperCase(),
-                                                ),
-                                              ),
+                                            value: value,
+                                            child: Text(
+                                              value.toUpperCase(),
+                                            ),
+                                          ),
                                         )
                                         .toList(),
                                     onChanged: (String? value) {

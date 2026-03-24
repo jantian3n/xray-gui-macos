@@ -11,13 +11,18 @@ Current capabilities:
 - import `vless://` links;
 - import script-style `client_outbound.json`;
 - apply `client_split_patch.json` onto the selected node;
-- compile Xray JSON for `localProxy` mode;
+- compile Xray JSON for desktop proxy modes;
 - start and stop a local `xray` subprocess on macOS;
+- enable and restore macOS system proxy settings automatically;
 - install bundled `geoip.dat` and `geosite.dat`;
 - stream runtime logs back into the UI.
 
-The first macOS milestone intentionally focuses on local SOCKS/HTTP proxy mode.
-System-level VPN/TUN and automatic system proxy switching are not part of this initial repo setup.
+The current macOS milestone supports two runtime modes:
+
+- `系统代理`: start local SOCKS/HTTP ports and write them into macOS proxy settings;
+- `本地代理`: only start local ports and leave system settings untouched.
+
+System-level VPN/TUN is still not part of this repo yet.
 
 ## Quick Start
 
@@ -63,12 +68,12 @@ test/
 
 ## Runtime Notes
 
-- Saved profiles are normalized into `localProxy` mode on macOS.
+- Saved profiles created from the legacy `vpn` mode are normalized into `系统代理` mode on macOS.
 - Default ports remain `127.0.0.1:10808` for SOCKS and `127.0.0.1:10809` for HTTP.
 - Geodata updates currently use `Loyalsoldier/v2ray-rules-dat`.
 
 ## Next Work
 
-- add macOS system proxy integration;
 - evaluate a real TUN path for full-device routing;
+- add a visible system-proxy status panel and recovery hints;
 - improve packaging, signing, and distribution.

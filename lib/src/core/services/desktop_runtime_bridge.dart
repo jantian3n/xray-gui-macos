@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../models/profile.dart';
 import '../models/runtime_mode.dart';
+import 'macos_system_proxy_manager.dart';
 import 'runtime_bridge.dart';
 
 class DesktopRuntimeBridge implements RuntimeBridge {
@@ -29,27 +30,43 @@ class DesktopRuntimeBridge implements RuntimeBridge {
   StreamSubscription<String>? _stdoutSubscription;
   StreamSubscription<String>? _stderrSubscription;
   Profile? _activeProfile;
+  MacosSystemProxyManager? _systemProxyManager;
   bool _stopRequested = false;
   String _state = 'idle';
 
   @override
   List<RuntimeMode> get supportedRuntimeModes => const <RuntimeMode>[
-    RuntimeMode.localProxy,
-  ];
+        RuntimeMode.systemProxy,
+        RuntimeMode.localProxy,
+      ];
 
   @override
   RuntimeMode normalizeRuntimeMode(RuntimeMode mode) {
-    return RuntimeMode.localProxy;
+    if (mode == RuntimeMode.vpn) {
+      return RuntimeMode.systemProxy;
+    }
+    return mode;
   }
 
   @override
   String runtimeModeDescription(RuntimeMode mode) {
     switch (mode) {
       case RuntimeMode.vpn:
-        return 'macOS 版当前还没有接入系统级 VPN/TUN，先统一使用本地代理模式。';
+        return 'macOS 版当前还没有接入系统级 VPN/TUN，先使用系统代理模式。';
+      case RuntimeMode.systemProxy:
+        return '启动本地 SOCKS/HTTP 代理，并自动写入 macOS 系统代理设置。更接近 Android 客户端的一键连接体验。';
       case RuntimeMode.localProxy:
-        return '启动本地 SOCKS/HTTP 代理端口，适合当前这版 macOS 客户端。';
+        return '仅启动本地 SOCKS/HTTP 代理端口，不修改系统代理，适合联调和排障。';
     }
+  }
+
+  @override
+  Future<void> initialize() async {
+    final _DesktopRuntimeLayout layout = await _prepareLayout();
+    final MacosSystemProxyManager systemProxyManager =
+        MacosSystemProxyManager(runtimeDir: layout.runtimeDir, emit: _emit);
+    _systemProxyManager = systemProxyManager;
+    await systemProxyManager.restoreStaleSnapshotIfNeeded();
   }
 
   @override
@@ -59,10 +76,12 @@ class DesktopRuntimeBridge implements RuntimeBridge {
 
   @override
   Future<void> start(Profile profile, Map<String, dynamic> config) async {
-    if (profile.runtimeMode != RuntimeMode.localProxy) {
-      throw UnsupportedError('macOS 版当前仅支持本地代理模式。');
+    final RuntimeMode effectiveMode = normalizeRuntimeMode(profile.runtimeMode);
+    if (!supportedRuntimeModes.contains(effectiveMode)) {
+      throw UnsupportedError('macOS 版当前不支持该运行模式。');
     }
 
+    await initialize();
     await stop();
 
     final _DesktopRuntimeLayout layout = await _prepareLayout();
@@ -100,9 +119,15 @@ class DesktopRuntimeBridge implements RuntimeBridge {
       _process = process;
       _stdoutSubscription = _listenToOutput(process.stdout);
       _stderrSubscription = _listenToOutput(process.stderr, prefix: 'stderr: ');
+      if (effectiveMode == RuntimeMode.systemProxy) {
+        await _systemProxyManager?.enable(profile);
+      }
       unawaited(_watchExit(process));
       _setState('running');
     } catch (error) {
+      if (_process != null) {
+        await stop();
+      }
       _setState('error');
       rethrow;
     }
@@ -138,9 +163,8 @@ class DesktopRuntimeBridge implements RuntimeBridge {
   @override
   Future<void> updateGeoData() async {
     final _DesktopRuntimeLayout layout = await _prepareLayout();
-    final int? proxyPort = _state == 'running'
-        ? _activeProfile?.httpPort
-        : null;
+    final int? proxyPort =
+        _state == 'running' ? _activeProfile?.httpPort : null;
     final String routeLabel = proxyPort == null
         ? 'direct network'
         : 'local HTTP proxy 127.0.0.1:$proxyPort';
@@ -175,12 +199,12 @@ class DesktopRuntimeBridge implements RuntimeBridge {
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .listen((String line) {
-          final String trimmed = line.trim();
-          if (trimmed.isEmpty) {
-            return;
-          }
-          _emit('$prefix$trimmed');
-        });
+      final String trimmed = line.trim();
+      if (trimmed.isEmpty) {
+        return;
+      }
+      _emit('$prefix$trimmed');
+    });
   }
 
   Future<void> _watchExit(Process process) async {
@@ -194,11 +218,20 @@ class DesktopRuntimeBridge implements RuntimeBridge {
     _stdoutSubscription = null;
     _stderrSubscription = null;
     _process = null;
+    String? proxyRestoreError;
+    try {
+      await _systemProxyManager?.restoreIfNeeded();
+    } catch (error) {
+      proxyRestoreError = '$error';
+      _emit('system-proxy-restore-error: $error');
+    }
 
     final bool stopRequested = _stopRequested;
     _stopRequested = false;
 
-    if (exitCode == 0) {
+    if (proxyRestoreError != null) {
+      _setState('error');
+    } else if (exitCode == 0) {
       _emit(stopRequested ? 'xray stopped.' : 'xray exited normally.');
       _setState('stopped');
     } else {
@@ -322,9 +355,12 @@ class DesktopRuntimeBridge implements RuntimeBridge {
 
   Future<String?> _findBinaryOnPath(String binaryName) async {
     final String finder = Platform.isWindows ? 'where' : 'which';
-    final ProcessResult result = await Process.run(finder, <String>[
-      binaryName,
-    ], runInShell: Platform.isWindows);
+    final ProcessResult result = await Process.run(
+        finder,
+        <String>[
+          binaryName,
+        ],
+        runInShell: Platform.isWindows);
     if (result.exitCode != 0) {
       return null;
     }
@@ -370,9 +406,8 @@ class DesktopRuntimeBridge implements RuntimeBridge {
         .split(RegExp(r'\s+'))
         .where((String item) => item.isNotEmpty)
         .toList(growable: false);
-    final String expectedHash = checksumParts.isEmpty
-        ? ''
-        : checksumParts.first;
+    final String expectedHash =
+        checksumParts.isEmpty ? '' : checksumParts.first;
 
     if (expectedHash.isEmpty) {
       await _deleteIfExists(tempFile);
@@ -476,17 +511,11 @@ class DesktopRuntimeBridge implements RuntimeBridge {
   }
 
   String get _platformAssetFolder {
-    if (Platform.isMacOS) {
-      return 'macos';
-    }
-    if (Platform.isWindows) {
-      return 'windows';
-    }
-    return 'desktop';
+    return 'macos';
   }
 
   String get _xrayBinaryName {
-    return Platform.isWindows ? 'xray.exe' : 'xray';
+    return 'xray';
   }
 }
 
