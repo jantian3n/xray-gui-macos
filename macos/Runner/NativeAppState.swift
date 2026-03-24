@@ -50,12 +50,16 @@ final class NativeAppState: ObservableObject {
   @Published private(set) var runtimeBinaryPath = ""
   @Published private(set) var runtimeGeodataPath = ""
   @Published private(set) var isRuntimeActionInFlight = false
+  @Published private(set) var packetTunnelStatus: NativePacketTunnelStatus = .notInstalled
+  @Published private(set) var packetTunnelProviderBundleIdentifier = ""
+  @Published private(set) var isPacketTunnelActionInFlight = false
 
   private let importer = NativeNodeImporter()
   private let compiler = NativeXrayConfigCompiler()
   private let uriParser = NativeVlessURIParser()
   private var nodeStore: NativeNodeStore?
   private var runtimeService: NativeRuntimeService?
+  private var packetTunnelService: NativePacketTunnelService?
   private var runtimeLogLines: [String] = []
 
   private init() {}
@@ -66,6 +70,25 @@ final class NativeAppState: ObservableObject {
 
   var canStopRuntime: Bool {
     !isRuntimeActionInFlight && (runtimeState == .running || runtimeState == .starting)
+  }
+
+  var canInstallPacketTunnel: Bool {
+    importedNode != nil && !isPacketTunnelActionInFlight
+  }
+
+  var canStartPacketTunnel: Bool {
+    importedNode != nil
+      && !isPacketTunnelActionInFlight
+      && packetTunnelStatus != .installing
+      && packetTunnelStatus != .connecting
+      && packetTunnelStatus != .connected
+  }
+
+  var canStopPacketTunnel: Bool {
+    !isPacketTunnelActionInFlight
+      && (packetTunnelStatus == .connecting
+        || packetTunnelStatus == .connected
+        || packetTunnelStatus == .reasserting)
   }
 
   func bootstrap() {
@@ -170,8 +193,38 @@ final class NativeAppState: ObservableObject {
     }
   }
 
+  func installPacketTunnelConfiguration() {
+    guard !isPacketTunnelActionInFlight else {
+      return
+    }
+
+    Task {
+      await performInstallPacketTunnelConfiguration()
+    }
+  }
+
+  func startPacketTunnel() {
+    guard !isPacketTunnelActionInFlight else {
+      return
+    }
+
+    Task {
+      await performStartPacketTunnel()
+    }
+  }
+
+  func stopPacketTunnel() {
+    guard !isPacketTunnelActionInFlight else {
+      return
+    }
+
+    Task {
+      await performStopPacketTunnel()
+    }
+  }
+
   private func configureStaticContent() {
-    statusSummary = "原生 macOS 壳已经接管入口，接下来把保存、运行时和系统代理也一起迁到 Swift。"
+    statusSummary = "原生 macOS 壳已经接管入口，当前继续把 Packet Tunnel / NetworkExtension 的控制面接到 Swift。"
     lastUpdated = Date()
     milestones = [
       Milestone(
@@ -189,7 +242,13 @@ final class NativeAppState: ObservableObject {
       Milestone(
         id: "runtime",
         title: "原生运行时与系统代理",
-        detail: "Swift 版开始接管节点存储、xray 子进程、日志和 macOS 系统代理。",
+        detail: "Swift 版已经接管节点存储、xray 子进程、日志和 macOS 系统代理。",
+        status: .completed
+      ),
+      Milestone(
+        id: "tunnel",
+        title: "Packet Tunnel / NetworkExtension",
+        detail: "开始把 Packet Tunnel 扩展 target 和宿主控制链路接进原生工程，数据面仍待迁移。",
         status: .inProgress
       ),
     ]
@@ -197,6 +256,7 @@ final class NativeAppState: ObservableObject {
       "现有 Flutter 版本的功能还保留在仓库里，方便逐块对照迁移。",
       "目标不是双端长期共存，而是把 macOS 版逐步完全收口到 Swift。",
       "优先迁移最短可用链路：导入节点、保存节点、生成配置、启动运行时、系统代理、再到 Packet Tunnel。",
+      "Packet Tunnel 这一步会先搭控制面，避免数据面还没接完时直接把系统流量黑洞掉。",
     ]
   }
 
@@ -224,6 +284,23 @@ final class NativeAppState: ObservableObject {
 
       try runtimeService.initialize()
       appendRuntimeLog("native runtime base directory: \(baseDirectoryURL.path)")
+
+      let packetTunnelService = NativePacketTunnelService(
+        stateDidChange: { [weak self] status in
+          Task { @MainActor in
+            self?.packetTunnelStatus = status
+            self?.lastUpdated = Date()
+          }
+        },
+        logDidEmit: { [weak self] message in
+          Task { @MainActor in
+            self?.appendRuntimeLog("packet tunnel: \(message)")
+          }
+        }
+      )
+      self.packetTunnelService = packetTunnelService
+      packetTunnelProviderBundleIdentifier = packetTunnelService.providerBundleIdentifier
+      await packetTunnelService.refresh()
 
       let collection = try nodeStore.load()
       savedNodes = collection.nodes
@@ -293,6 +370,66 @@ final class NativeAppState: ObservableObject {
     lastUpdated = Date()
   }
 
+  private func performInstallPacketTunnelConfiguration() async {
+    guard let packetTunnelService else {
+      lastErrorMessage = "Packet Tunnel 服务还没有初始化完成。"
+      return
+    }
+
+    isPacketTunnelActionInFlight = true
+    defer { isPacketTunnelActionInFlight = false }
+
+    do {
+      let (profile, config) = try packetTunnelLaunchContext()
+      try await packetTunnelService.installOrUpdate(profile: profile, config: config)
+      packetTunnelProviderBundleIdentifier = packetTunnelService.providerBundleIdentifier
+      lastErrorMessage = nil
+      statusSummary = "Packet Tunnel 配置已经写入 NetworkExtension，宿主和扩展的控制面已经接通。"
+      lastUpdated = Date()
+    } catch {
+      lastErrorMessage = localizedMessage(for: error)
+      appendRuntimeLog("packet tunnel install failed: \(localizedMessage(for: error))")
+      lastUpdated = Date()
+    }
+  }
+
+  private func performStartPacketTunnel() async {
+    guard let packetTunnelService else {
+      lastErrorMessage = "Packet Tunnel 服务还没有初始化完成。"
+      return
+    }
+
+    isPacketTunnelActionInFlight = true
+    defer { isPacketTunnelActionInFlight = false }
+
+    do {
+      let (profile, config) = try packetTunnelLaunchContext()
+      try await packetTunnelService.start(profile: profile, config: config)
+      packetTunnelProviderBundleIdentifier = packetTunnelService.providerBundleIdentifier
+      lastErrorMessage = nil
+      statusSummary = "已请求启动 Packet Tunnel。当前版本会安全地返回“数据面未接入”提示，避免直接接管系统流量。"
+      lastUpdated = Date()
+    } catch {
+      lastErrorMessage = localizedMessage(for: error)
+      appendRuntimeLog("packet tunnel start failed: \(localizedMessage(for: error))")
+      lastUpdated = Date()
+    }
+  }
+
+  private func performStopPacketTunnel() async {
+    guard let packetTunnelService else {
+      lastErrorMessage = "Packet Tunnel 服务还没有初始化完成。"
+      return
+    }
+
+    isPacketTunnelActionInFlight = true
+    defer { isPacketTunnelActionInFlight = false }
+
+    await packetTunnelService.stop()
+    statusSummary = "已请求停止 Packet Tunnel。"
+    lastUpdated = Date()
+  }
+
   private func persistSavedNodes() {
     guard let nodeStore else {
       return
@@ -356,6 +493,20 @@ final class NativeAppState: ObservableObject {
       runtimeLogLines.removeFirst(runtimeLogLines.count - 300)
     }
     runtimeLogText = runtimeLogLines.joined(separator: "\n")
+  }
+
+  private func packetTunnelLaunchContext() throws -> (NativeProfile, [String: Any]) {
+    guard let importedNode else {
+      throw NativeImportError.message("当前没有可用于 Packet Tunnel 的节点。")
+    }
+
+    let profile = NativeProfile.from(
+      node: importedNode,
+      routingPreset: selectedRoutingPreset,
+      runtimeMode: .vpn
+    )
+    let config = try compiler.compile(profile: profile)
+    return (profile, config)
   }
 
   private static let logDateFormatter: DateFormatter = {

@@ -15,13 +15,15 @@ What is already in place:
 - saved node snapshots are now persisted by the native app;
 - the native app can now start a local `xray` subprocess and stream runtime logs;
 - `系统代理` mode now starts wiring through a native macOS proxy manager with snapshot/restore;
+- a first `PacketTunnel` NetworkExtension target is now part of the Xcode project;
+- the host app now manages Packet Tunnel preferences through `NETunnelProviderManager`;
 - the old Flutter/Dart code is still kept in the repo as migration reference.
 
 What is not fully migrated yet:
 
 - subscriptions and richer profile editing;
 - deeper runtime validation and production packaging polish;
-- Packet Tunnel / NetworkExtension for TUN-style routing.
+- the actual Packet Tunnel dataplane that forwards traffic instead of only wiring the control plane.
 
 ## Quick Start
 
@@ -59,6 +61,7 @@ The native macOS shell can already:
 - save imported nodes into native local storage;
 - generate a pretty-printed Xray JSON preview through Swift logic;
 - start and stop a native `xray` runtime flow;
+- install and manage a Packet Tunnel configuration from the native host app;
 - show runtime logs inside the native UI.
 
 This is the foundation for the next migration steps.
@@ -67,5 +70,5 @@ This is the foundation for the next migration steps.
 
 - move subscription import and richer profile management to Swift;
 - harden runtime behavior, startup validation, and recovery UX;
-- add NetworkExtension Packet Tunnel support;
+- move the Packet Tunnel dataplane into the extension so VPN mode becomes truly usable;
 - finish signing, packaging, and distribution for a real macOS `.app`.

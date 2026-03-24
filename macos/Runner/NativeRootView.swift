@@ -47,11 +47,12 @@ struct NativeRootView: View {
           Label("原生入口已经切到 SwiftUI / AppKit", systemImage: "checkmark.circle")
           Label("Swift 版已经能解析 `vless://` 和部分 JSON 导入", systemImage: "link.badge.plus")
           Label("Swift 版已经能保存节点、生成 Xray JSON，并启动原生运行时", systemImage: "doc.badge.gearshape")
+          Label("Packet Tunnel 扩展骨架和宿主管理链路已经开始接入", systemImage: "point.3.filled.connected.trianglepath.dotted")
         }
 
         infoCard(title: "离原生可用版还差什么") {
           Label("继续把订阅、节点编辑和配置管理完整迁到 Swift", systemImage: "shippingbox")
-          Label("继续把 Packet Tunnel / NetworkExtension 切到原生实现", systemImage: "shield.lefthalf.filled")
+          Label("继续把 Packet Tunnel 的真实数据面迁到扩展内部", systemImage: "shield.lefthalf.filled")
           Label("补齐签名、权限和打包流程，就能更接近真正可分发的 .app", systemImage: "app.badge")
         }
       }
@@ -148,6 +149,43 @@ struct NativeRootView: View {
 
           if !appState.runtimeGeodataPath.isEmpty {
             Label("geodata: \(appState.runtimeGeodataPath)", systemImage: "tray.full")
+              .textSelection(.enabled)
+          }
+        }
+
+        infoCard(title: "Packet Tunnel") {
+          HStack {
+            Label("当前状态: \(appState.packetTunnelStatus.label)", systemImage: "shield.checkered")
+            Spacer()
+            if appState.isPacketTunnelActionInFlight {
+              ProgressView()
+                .controlSize(.small)
+            }
+          }
+
+          Text("这一块已经接进 `NetworkExtension` 的宿主控制面。当前版本会安全地阻止真正的 TUN 接管，避免数据面未完成时直接黑洞系统流量。")
+            .foregroundStyle(.secondary)
+
+          HStack(spacing: 12) {
+            Button("安装 / 更新配置") {
+              appState.installPacketTunnelConfiguration()
+            }
+            .disabled(!appState.canInstallPacketTunnel)
+
+            Button("启动 Tunnel") {
+              appState.startPacketTunnel()
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!appState.canStartPacketTunnel)
+
+            Button("停止 Tunnel") {
+              appState.stopPacketTunnel()
+            }
+            .disabled(!appState.canStopPacketTunnel)
+          }
+
+          if !appState.packetTunnelProviderBundleIdentifier.isEmpty {
+            Label("provider bundle: \(appState.packetTunnelProviderBundleIdentifier)", systemImage: "shippingbox")
               .textSelection(.enabled)
           }
         }
