@@ -1,56 +1,37 @@
 # Xray GUI macOS
 
-macOS-first Flutter shell for an Xray-based GUI client.
+Native macOS rewrite of the Android-first Xray GUI project.
 
-## Current Scope
+## Current Direction
 
-This repository keeps the reusable Flutter UI and a macOS desktop runtime bridge.
+This repo is now moving toward a full `Swift + SwiftUI + AppKit + NetworkExtension` stack.
 
-Current capabilities:
+What is already in place:
 
-- import `vless://` links;
-- import script-style `client_outbound.json`;
-- apply `client_split_patch.json` onto the selected node;
-- compile Xray JSON for desktop proxy modes;
-- start and stop a local `xray` subprocess on macOS;
-- enable and restore macOS system proxy settings automatically;
-- install bundled `geoip.dat` and `geosite.dat`;
-- stream runtime logs back into the UI.
+- the macOS app entry point is native Swift, not a Flutter window anymore;
+- the current window and menu are hosted by SwiftUI/AppKit;
+- a first Swift implementation now parses `vless://` links and script-style outbound JSON;
+- a first Swift implementation now compiles Xray JSON for macOS proxy modes;
+- the old Flutter/Dart code is still kept in the repo as migration reference.
 
-The current macOS milestone supports two runtime modes:
+What is not fully migrated yet:
 
-- `系统代理`: start local SOCKS/HTTP ports and write them into macOS proxy settings;
-- `本地代理`: only start local ports and leave system settings untouched.
-
-System-level VPN/TUN is still not part of this repo yet.
+- profile persistence and subscriptions;
+- native `xray` process lifecycle and log streaming;
+- native system-proxy management wiring;
+- Packet Tunnel / NetworkExtension for TUN-style routing.
 
 ## Quick Start
 
-1. Install Flutter on macOS.
-2. Prepare a local `xray` binary and bundle it:
+1. Install full Xcode on macOS.
+2. Open `macos/Runner.xcodeproj` in Xcode.
+3. Run the `Runner` target.
 
-```bash
-bash ./scripts/build_desktop_xray.sh /absolute/path/to/xray
-```
+The repository still contains:
 
-3. Fetch Flutter dependencies:
-
-```bash
-flutter pub get
-```
-
-4. Run the app:
-
-```bash
-flutter run -d macos
-```
-
-You can also skip bundling and point the app at a custom binary at runtime:
-
-```bash
-export XRAY_GUI_XRAY_BINARY=/absolute/path/to/xray
-flutter run -d macos
-```
+- `assets/bin/macos/xray` for bundled runtime experiments;
+- `lib/` as the legacy Flutter reference implementation;
+- `scripts/` from the earlier migration stage.
 
 ## Repository Layout
 
@@ -59,21 +40,27 @@ assets/
   bootstrap-geodata/
   bin/
 lib/
-  main.dart
-  src/
+  legacy Flutter/Dart reference logic
 macos/
+  native Swift macOS app target
 scripts/
 test/
 ```
 
-## Runtime Notes
+## Current Milestone
 
-- Saved profiles created from the legacy `vpn` mode are normalized into `系统代理` mode on macOS.
-- Default ports remain `127.0.0.1:10808` for SOCKS and `127.0.0.1:10809` for HTTP.
-- Geodata updates currently use `Loyalsoldier/v2ray-rules-dat`.
+The native macOS shell can already:
+
+- host a real SwiftUI window;
+- accept pasted node text;
+- parse imported node content through Swift logic;
+- generate a pretty-printed Xray JSON preview through Swift logic.
+
+This is the foundation for the next migration steps.
 
 ## Next Work
 
-- evaluate a real TUN path for full-device routing;
-- add a visible system-proxy status panel and recovery hints;
-- improve packaging, signing, and distribution.
+- move profile storage and subscription import to Swift;
+- move runtime process management and proxy control to Swift;
+- add NetworkExtension Packet Tunnel support;
+- finish signing, packaging, and distribution for a real macOS `.app`.
