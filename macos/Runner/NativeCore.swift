@@ -1,6 +1,6 @@
 import Foundation
 
-enum NativeRuntimeMode: String, CaseIterable, Identifiable {
+enum NativeRuntimeMode: String, Codable, CaseIterable, Identifiable {
   case vpn
   case systemProxy
   case localProxy
@@ -19,7 +19,7 @@ enum NativeRuntimeMode: String, CaseIterable, Identifiable {
   }
 }
 
-enum NativeRoutingPreset: String, CaseIterable, Identifiable {
+enum NativeRoutingPreset: String, Codable, CaseIterable, Identifiable {
   case cnDirect
   case globalProxy
   case gfwLike
@@ -49,7 +49,7 @@ enum NativeRoutingPreset: String, CaseIterable, Identifiable {
   }
 }
 
-struct NativeXhttpDownloadSettings: Equatable {
+struct NativeXhttpDownloadSettings: Codable, Equatable {
   let address: String
   let port: Int
   let network: String
@@ -102,7 +102,7 @@ struct NativeXhttpDownloadSettings: Equatable {
   }
 }
 
-struct NativeVlessNode: Equatable {
+struct NativeVlessNode: Codable, Equatable {
   let name: String
   let address: String
   let port: Int
@@ -173,7 +173,7 @@ struct NativeVlessNode: Equatable {
   }
 }
 
-struct NativeProfile: Equatable {
+struct NativeProfile: Codable, Equatable {
   let id: String
   let name: String
   let node: NativeVlessNode
@@ -304,6 +304,47 @@ struct NativeVlessURIParser {
       alpn: parseStringList(query["alpn"]),
       extras: extras
     )
+  }
+
+  func encode(_ node: NativeVlessNode) -> String {
+    var queryItems = node.extras
+
+    func putIfNotBlank(_ key: String, _ value: String) {
+      let normalized = value.trimmed()
+      if normalized.isEmpty {
+        queryItems.removeValue(forKey: key)
+      } else {
+        queryItems[key] = normalized
+      }
+    }
+
+    putIfNotBlank("encryption", node.encryption.isEmpty ? "none" : node.encryption)
+    putIfNotBlank("flow", node.flow)
+    putIfNotBlank("type", node.network)
+    putIfNotBlank("security", node.security)
+    putIfNotBlank("sni", node.serverName)
+    putIfNotBlank("fp", node.fingerprint)
+    putIfNotBlank("pbk", node.publicKey)
+    putIfNotBlank("sid", node.shortId)
+    putIfNotBlank("spx", node.spiderX)
+    putIfNotBlank("host", node.host)
+    putIfNotBlank("path", node.path)
+    putIfNotBlank("mode", node.mode)
+    putIfNotBlank("alpn", node.alpn.joined(separator: ","))
+
+    var components = URLComponents()
+    components.scheme = "vless"
+    components.user = node.id.trimmed()
+    components.host = node.address.trimmed()
+    components.port = node.port
+    components.fragment = node.name.trimmed().isEmpty ? nil : node.name.trimmed()
+    components.queryItems = queryItems.isEmpty
+      ? nil
+      : queryItems
+        .sorted(by: { $0.key < $1.key })
+        .map { URLQueryItem(name: $0.key, value: $0.value) }
+
+    return components.string ?? "vless://\(node.id)@\(node.address):\(node.port)"
   }
 
   private func normalizeNetwork(_ value: String) -> String {
@@ -991,7 +1032,7 @@ private func parseStringList(_ value: Any?) -> [String] {
   return []
 }
 
-private extension String {
+extension String {
   func trimmed() -> String {
     trimmingCharacters(in: .whitespacesAndNewlines)
   }

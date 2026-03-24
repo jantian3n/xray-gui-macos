@@ -12,13 +12,15 @@ What is already in place:
 - the current window and menu are hosted by SwiftUI/AppKit;
 - a first Swift implementation now parses `vless://` links and script-style outbound JSON;
 - a first Swift implementation now compiles Xray JSON for macOS proxy modes;
+- saved node snapshots are now persisted by the native app;
+- the native app can now start a local `xray` subprocess and stream runtime logs;
+- `系统代理` mode now starts wiring through a native macOS proxy manager with snapshot/restore;
 - the old Flutter/Dart code is still kept in the repo as migration reference.
 
 What is not fully migrated yet:
 
-- profile persistence and subscriptions;
-- native `xray` process lifecycle and log streaming;
-- native system-proxy management wiring;
+- subscriptions and richer profile editing;
+- deeper runtime validation and production packaging polish;
 - Packet Tunnel / NetworkExtension for TUN-style routing.
 
 ## Quick Start
@@ -54,13 +56,16 @@ The native macOS shell can already:
 - host a real SwiftUI window;
 - accept pasted node text;
 - parse imported node content through Swift logic;
-- generate a pretty-printed Xray JSON preview through Swift logic.
+- save imported nodes into native local storage;
+- generate a pretty-printed Xray JSON preview through Swift logic;
+- start and stop a native `xray` runtime flow;
+- show runtime logs inside the native UI.
 
 This is the foundation for the next migration steps.
 
 ## Next Work
 
-- move profile storage and subscription import to Swift;
-- move runtime process management and proxy control to Swift;
+- move subscription import and richer profile management to Swift;
+- harden runtime behavior, startup validation, and recovery UX;
 - add NetworkExtension Packet Tunnel support;
 - finish signing, packaging, and distribution for a real macOS `.app`.

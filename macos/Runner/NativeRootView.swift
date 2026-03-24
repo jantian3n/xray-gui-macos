@@ -46,12 +46,12 @@ struct NativeRootView: View {
         infoCard(title: "本轮已经接管的能力") {
           Label("原生入口已经切到 SwiftUI / AppKit", systemImage: "checkmark.circle")
           Label("Swift 版已经能解析 `vless://` 和部分 JSON 导入", systemImage: "link.badge.plus")
-          Label("Swift 版已经能生成 Xray JSON 预览", systemImage: "doc.badge.gearshape")
+          Label("Swift 版已经能保存节点、生成 Xray JSON，并启动原生运行时", systemImage: "doc.badge.gearshape")
         }
 
         infoCard(title: "离原生可用版还差什么") {
-          Label("把配置持久化、订阅、日志和 Xray 子进程迁到 Swift", systemImage: "shippingbox")
-          Label("把系统代理和后续 Packet Tunnel 也切到原生实现", systemImage: "shield.lefthalf.filled")
+          Label("继续把订阅、节点编辑和配置管理完整迁到 Swift", systemImage: "shippingbox")
+          Label("继续把 Packet Tunnel / NetworkExtension 切到原生实现", systemImage: "shield.lefthalf.filled")
           Label("补齐签名、权限和打包流程，就能更接近真正可分发的 .app", systemImage: "app.badge")
         }
       }
@@ -65,7 +65,7 @@ struct NativeRootView: View {
         headerCard(
           title: "Swift 工作台",
           subtitle: "原生业务逻辑预览",
-          body: "这里已经直接调用 Swift 版节点导入器和 Xray 配置编译器，不再依赖 Flutter。"
+          body: "这里已经直接调用 Swift 版节点导入器、原生存储、xray 运行时和系统代理管理器，不再依赖 Flutter。"
         )
 
         infoCard(title: "导入输入") {
@@ -106,6 +106,11 @@ struct NativeRootView: View {
               appState.resetToSample()
             }
 
+            Button("保存当前节点") {
+              appState.saveCurrentNode()
+            }
+            .disabled(appState.importedNode == nil)
+
             Button("导入并生成配置") {
               appState.importCurrentText()
             }
@@ -113,9 +118,81 @@ struct NativeRootView: View {
           }
         }
 
+        infoCard(title: "运行控制") {
+          HStack {
+            Label("当前状态: \(appState.runtimeState.label)", systemImage: "bolt.horizontal.circle")
+            Spacer()
+            if appState.isRuntimeActionInFlight {
+              ProgressView()
+                .controlSize(.small)
+            }
+          }
+
+          HStack(spacing: 12) {
+            Button("启动运行时") {
+              appState.startRuntime()
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!appState.canStartRuntime)
+
+            Button("停止运行时") {
+              appState.stopRuntime()
+            }
+            .disabled(!appState.canStopRuntime)
+          }
+
+          if !appState.runtimeBinaryPath.isEmpty {
+            Label("xray: \(appState.runtimeBinaryPath)", systemImage: "terminal")
+              .textSelection(.enabled)
+          }
+
+          if !appState.runtimeGeodataPath.isEmpty {
+            Label("geodata: \(appState.runtimeGeodataPath)", systemImage: "tray.full")
+              .textSelection(.enabled)
+          }
+        }
+
+        if !appState.savedNodes.isEmpty {
+          infoCard(title: "已保存节点") {
+            ForEach(appState.savedNodes) { draft in
+              HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                  HStack(spacing: 8) {
+                    Text(draft.title)
+                      .font(.headline)
+                    if appState.selectedSavedNodeID == draft.id {
+                      Text("当前")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.blue.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                  }
+                  Text("\(draft.node.address):\(draft.node.port)")
+                  Text("\(draft.routingPreset.label) / \(draft.runtimeMode.label)")
+                }
+
+                Spacer()
+
+                HStack(spacing: 8) {
+                  Button("载入") {
+                    appState.loadSavedNode(draft)
+                  }
+                  Button("删除") {
+                    appState.deleteSavedNode(draft)
+                  }
+                }
+              }
+              .frame(maxWidth: .infinity, alignment: .leading)
+              .padding(.vertical, 6)
+            }
+          }
+        }
+
         if let errorMessage = appState.lastErrorMessage {
           VStack(alignment: .leading, spacing: 8) {
-            Label("导入失败", systemImage: "exclamationmark.triangle.fill")
+            Label("最近错误", systemImage: "exclamationmark.triangle.fill")
               .font(.headline)
               .foregroundStyle(.red)
             Text(errorMessage)
@@ -152,6 +229,18 @@ struct NativeRootView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(minHeight: 320)
+          }
+        }
+
+        if !appState.runtimeLogText.isEmpty {
+          infoCard(title: "运行日志") {
+            ScrollView(.horizontal) {
+              Text(appState.runtimeLogText)
+                .font(.system(.footnote, design: .monospaced))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(minHeight: 220)
           }
         }
       }
