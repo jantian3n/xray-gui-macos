@@ -620,6 +620,8 @@ class _HomePageState extends State<HomePage> {
         barrierDismissible: true,
         builder: (BuildContext context) {
           return Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
             insetPadding: const EdgeInsets.symmetric(
               horizontal: 32,
               vertical: 24,
@@ -858,105 +860,153 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Row(
-          children: <Widget>[
-            Container(
-              width: 250,
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.72),
-                border: Border(
-                  right: BorderSide(
-                    color: colors.outlineVariant.withValues(alpha: 0.45),
-                  ),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  _buildMacSidebarHeader(theme),
-                  const SizedBox(height: 20),
-                  ..._HomeTab.values.map(
-                    (_HomeTab tab) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: _MacSidebarItem(
-                        icon: _tabIcon(tab),
-                        label: _tabTitle(tab),
-                        selected: tab == currentTab,
-                        onPressed: () {
-                          setState(() {
-                            _selectedTabIndex = tab.index;
-                          });
-                        },
-                      ),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: <Color>[
+              Color(0xFFF8FAFD),
+              Color(0xFFF3F5F8),
+              Color(0xFFF1F3F6),
+            ],
+            stops: <double>[0, 0.42, 1],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 272,
+                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.74),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: colors.outlineVariant.withValues(alpha: 0.92),
                     ),
-                  ),
-                  const Spacer(),
-                  if (_selectedDraft != null)
-                    _buildMacSidebarNodeSummary(theme),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: FilledButton.tonalIcon(
-                          onPressed: _isRuntimeLocked
-                              ? null
-                              : () {
-                                  _handleImportAction(_ImportAction.clipboard);
-                                },
-                          icon: const Icon(Icons.add_link_outlined),
-                          label: const Text('导入'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _isRuntimeLocked
-                              ? null
-                              : () {
-                                  _handleImportAction(_ImportAction.manual);
-                                },
-                          icon: const Icon(Icons.edit_note_outlined),
-                          label: const Text('手动'),
-                        ),
+                    boxShadow: <BoxShadow>[
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.035),
+                        blurRadius: 24,
+                        offset: const Offset(0, 10),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Column(
-                children: <Widget>[
-                  _buildMacToolbar(theme, currentTab, node),
-                  Expanded(
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 220),
-                      child: Align(
-                        key: ValueKey<_HomeTab>(currentTab),
-                        alignment: Alignment.topCenter,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 1120),
-                          child: ListView(
-                            padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
-                            children: _buildTabChildren(
-                              currentTab,
-                              theme,
-                              node,
-                            ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      _buildMacSidebarHeader(theme),
+                      const SizedBox(height: 22),
+                      Text(
+                        '工作区',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                          letterSpacing: 0.25,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ..._HomeTab.values.map(
+                        (_HomeTab tab) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: _MacSidebarItem(
+                            icon: _tabIcon(tab),
+                            label: _tabTitle(tab),
+                            selected: tab == currentTab,
+                            onPressed: () {
+                              setState(() {
+                                _selectedTabIndex = tab.index;
+                              });
+                            },
                           ),
                         ),
                       ),
+                      const Spacer(),
+                      if (_selectedDraft != null) ...<Widget>[
+                        _buildMacSidebarNodeSummary(theme),
+                        const SizedBox(height: 12),
+                      ],
+                      _buildMacImportButton(
+                        fillWidth: true,
+                        label: '新建或导入节点',
+                      ),
+                      if (_hasSelection) ...<Widget>[
+                        const SizedBox(height: 6),
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton.icon(
+                            onPressed: _isRuntimeLocked
+                                ? null
+                                : _applyPatchFromClipboard,
+                            icon: const Icon(Icons.merge_type_rounded),
+                            label: const Text('应用 split patch'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.54),
+                      borderRadius: BorderRadius.circular(26),
+                      border: Border.all(
+                        color: colors.outlineVariant.withValues(alpha: 0.9),
+                      ),
+                    ),
+                    child: Column(
+                      children: <Widget>[
+                        _buildMacToolbar(theme, currentTab, node),
+                        Expanded(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 220),
+                            child: Padding(
+                              key: ValueKey<_HomeTab>(currentTab),
+                              padding:
+                                  const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                child: ConstrainedBox(
+                                  constraints:
+                                      const BoxConstraints(maxWidth: 1160),
+                                  child:
+                                      _buildMacTabContent(theme, currentTab, node),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildMacTabContent(
+    ThemeData theme,
+    _HomeTab tab,
+    VlessNode? node,
+  ) {
+    switch (tab) {
+      case _HomeTab.connection:
+        return _buildMacConnectionWorkspace(theme, node);
+      case _HomeTab.nodes:
+        return _buildMacNodesWorkspace(theme);
+      case _HomeTab.routing:
+        return _buildMacRoutingWorkspace(theme);
+      case _HomeTab.logs:
+        return _buildMacLogsWorkspace(theme, node);
+    }
   }
 
   List<Widget> _buildTabChildren(
@@ -966,46 +1016,6 @@ class _HomePageState extends State<HomePage> {
   ) {
     switch (tab) {
       case _HomeTab.connection:
-        if (_useMacDesktopLayout) {
-          return <Widget>[
-            LayoutBuilder(
-              builder: (BuildContext context, BoxConstraints constraints) {
-                final bool useWideCards = constraints.maxWidth >= 920;
-                if (!useWideCards) {
-                  return Column(
-                    children: <Widget>[
-                      _buildOverviewCard(theme, node),
-                      const SizedBox(height: 16),
-                      _buildCurrentNodeCard(theme),
-                      const SizedBox(height: 16),
-                      _buildActionsCard(),
-                    ],
-                  );
-                }
-
-                return Wrap(
-                  spacing: 16,
-                  runSpacing: 16,
-                  children: <Widget>[
-                    SizedBox(
-                      width: (constraints.maxWidth - 16) / 2,
-                      child: _buildOverviewCard(theme, node),
-                    ),
-                    SizedBox(
-                      width: (constraints.maxWidth - 16) / 2,
-                      child: _buildCurrentNodeCard(theme),
-                    ),
-                    SizedBox(
-                      width: constraints.maxWidth,
-                      child: _buildActionsCard(),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ];
-        }
-
         return <Widget>[
           _buildOverviewCard(theme, node),
           const SizedBox(height: 12),
@@ -1018,46 +1028,6 @@ class _HomePageState extends State<HomePage> {
           _buildNodeListCard(theme),
         ];
       case _HomeTab.routing:
-        if (_useMacDesktopLayout) {
-          return <Widget>[
-            LayoutBuilder(
-              builder: (BuildContext context, BoxConstraints constraints) {
-                final bool useWideCards = constraints.maxWidth >= 920;
-                if (!useWideCards) {
-                  return Column(
-                    children: <Widget>[
-                      _buildPreferencesCard(theme),
-                      const SizedBox(height: 16),
-                      _buildGeoDataCard(theme),
-                    ],
-                  );
-                }
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Expanded(child: _buildPreferencesCard(theme)),
-                    const SizedBox(width: 16),
-                    Expanded(child: _buildGeoDataCard(theme)),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            _buildExpandablePanel(
-              context: context,
-              icon: Icons.code_outlined,
-              title: '生成配置',
-              subtitle: _configPreview.isEmpty
-                  ? '选择节点后查看生成的 Xray 配置'
-                  : '当前预览长度 ${_configPreview.length} 字符',
-              content: _configPreview.isEmpty
-                  ? '还没有可预览的配置。先导入一个节点，再调整分流策略和本地代理模式。'
-                  : _configPreview,
-            ),
-          ];
-        }
-
         return <Widget>[
           _buildPreferencesCard(theme),
           const SizedBox(height: 12),
@@ -1078,7 +1048,7 @@ class _HomePageState extends State<HomePage> {
       case _HomeTab.logs:
         return <Widget>[
           _buildOverviewCard(theme, node),
-          SizedBox(height: _useMacDesktopLayout ? 16 : 12),
+          const SizedBox(height: 12),
           _buildExpandablePanel(
             context: context,
             icon: Icons.receipt_long_outlined,
@@ -1096,29 +1066,22 @@ class _HomePageState extends State<HomePage> {
   Widget _buildMacSidebarHeader(ThemeData theme) {
     final ColorScheme colors = theme.colorScheme;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.84),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(alpha: 0.45),
-        ),
-      ),
+    return _MacPanel(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            'Xray for macOS',
-            style: theme.textTheme.titleMedium?.copyWith(
+            'Xray',
+            style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w700,
+              letterSpacing: -0.4,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
-            '状态栏常驻、本地代理模式、节点切换与实时速率。',
-            style: theme.textTheme.bodySmall?.copyWith(
+            'macOS 本地代理控制台',
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: colors.onSurfaceVariant,
             ),
           ),
@@ -1133,18 +1096,39 @@ class _HomePageState extends State<HomePage> {
               ),
               if (_hasSelection)
                 _InfoChip(
-                  icon: Icons.upload_rounded,
+                  icon: Icons.arrow_upward_rounded,
                   label:
                       _formatTrafficRate(_trafficSnapshot.uploadBytesPerSecond),
                 ),
               if (_hasSelection)
                 _InfoChip(
-                  icon: Icons.download_rounded,
+                  icon: Icons.arrow_downward_rounded,
                   label: _formatTrafficRate(
-                      _trafficSnapshot.downloadBytesPerSecond),
+                    _trafficSnapshot.downloadBytesPerSecond,
+                  ),
                 ),
             ],
           ),
+          if (_selectedDraft != null) ...<Widget>[
+            const SizedBox(height: 14),
+            Text(
+              _draftTitle(_selectedDraft!),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _draftSubtitle(_selectedDraft!),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1154,16 +1138,8 @@ class _HomePageState extends State<HomePage> {
     final ColorScheme colors = theme.colorScheme;
     final StoredNodeDraft? draft = _selectedDraft;
 
-    return Container(
-      width: double.infinity,
+    return _MacPanel(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(alpha: 0.4),
-        ),
-      ),
       child: draft == null
           ? Text(
               '还没有选中的节点。',
@@ -1209,14 +1185,15 @@ class _HomePageState extends State<HomePage> {
     VlessNode? node,
   ) {
     final ColorScheme colors = theme.colorScheme;
+    final StoredNodeDraft? draft = _selectedDraft;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 16),
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.5),
+        color: Colors.white.withValues(alpha: 0.38),
         border: Border(
           bottom: BorderSide(
-            color: colors.outlineVariant.withValues(alpha: 0.4),
+            color: colors.outlineVariant.withValues(alpha: 0.9),
           ),
         ),
       ),
@@ -1231,48 +1208,1266 @@ class _HomePageState extends State<HomePage> {
                   _tabTitle(currentTab),
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   _tabSubtitle(currentTab, node),
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  style: theme.textTheme.bodySmall?.copyWith(
                     color: colors.onSurfaceVariant,
                   ),
                 ),
               ],
             ),
           ),
+          if (draft != null) ...<Widget>[
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 240),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: <Widget>[
+                  Text(
+                    _draftTitle(draft),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _draftSubtitle(draft),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+          ],
+          _StatusChip(
+            label: _statusLabel(_status),
+            color: _statusColor(colors, _status),
+          ),
           if (_hasSelection) ...<Widget>[
-            _InfoChip(
-              icon: Icons.upload_rounded,
+            const SizedBox(width: 12),
+            _MacTrafficReadout(
+              icon: Icons.arrow_upward_rounded,
               label: _formatTrafficRate(_trafficSnapshot.uploadBytesPerSecond),
             ),
             const SizedBox(width: 10),
-            _InfoChip(
-              icon: Icons.download_rounded,
-              label:
-                  _formatTrafficRate(_trafficSnapshot.downloadBytesPerSecond),
+            _MacTrafficReadout(
+              icon: Icons.arrow_downward_rounded,
+              label: _formatTrafficRate(_trafficSnapshot.downloadBytesPerSecond),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 16),
           ],
           OutlinedButton.icon(
             onPressed: const <String>{'starting', 'running', 'running-dry'}
                     .contains(_status)
                 ? _stopRuntime
                 : null,
-            icon: const Icon(Icons.stop_circle_outlined),
+            icon: const Icon(Icons.stop_circle_outlined, size: 18),
             label: const Text('停止'),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           FilledButton.icon(
             onPressed:
                 _hasSelection && !_isRuntimeLocked ? _startRuntime : null,
-            icon: const Icon(Icons.play_arrow_rounded),
+            icon: const Icon(Icons.play_arrow_rounded, size: 18),
             label: Text(_status == 'running' ? '已连接' : '连接'),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMacConnectionWorkspace(ThemeData theme, VlessNode? node) {
+    return SingleChildScrollView(
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final bool useWideLayout = constraints.maxWidth >= 980;
+          if (!useWideLayout) {
+            return Column(
+              children: <Widget>[
+                _buildMacConnectionHero(theme, node),
+                const SizedBox(height: 18),
+                _buildMacCurrentNodeInspector(theme),
+                const SizedBox(height: 18),
+                _buildMacQuickActionsPanel(theme),
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                flex: 7,
+                child: _buildMacConnectionHero(theme, node),
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                flex: 5,
+                child: Column(
+                  children: <Widget>[
+                    _buildMacCurrentNodeInspector(theme),
+                    const SizedBox(height: 18),
+                    _buildMacQuickActionsPanel(theme),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildMacNodesWorkspace(ThemeData theme) {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final bool useWideLayout = constraints.maxWidth >= 980;
+        if (!useWideLayout) {
+          return SingleChildScrollView(
+            child: Column(
+              children: <Widget>[
+                _buildMacNodeLibraryPanel(theme, fillHeight: false),
+                const SizedBox(height: 18),
+                _buildMacNodeDetailPanel(theme),
+              ],
+            ),
+          );
+        }
+
+        final double contentHeight =
+            constraints.maxHeight.isFinite ? constraints.maxHeight : 700;
+
+        return SizedBox(
+          height: contentHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              SizedBox(
+                width: 388,
+                child: _buildMacNodeLibraryPanel(
+                  theme,
+                  fillHeight: true,
+                ),
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: _buildMacNodeDetailPanel(theme),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMacRoutingWorkspace(ThemeData theme) {
+    return SingleChildScrollView(
+      child: Column(
+        children: <Widget>[
+          LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              final bool useWideLayout = constraints.maxWidth >= 980;
+              if (!useWideLayout) {
+                return Column(
+                  children: <Widget>[
+                    _buildMacRoutingPreferencesPanel(theme),
+                    const SizedBox(height: 18),
+                    _buildMacGeoDataPanel(theme),
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(child: _buildMacRoutingPreferencesPanel(theme)),
+                  const SizedBox(width: 18),
+                  Expanded(child: _buildMacGeoDataPanel(theme)),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            height: 420,
+            child: _buildMacCodePanel(
+              theme,
+              icon: Icons.code_outlined,
+              title: '生成配置',
+              subtitle: _configPreview.isEmpty
+                  ? '选择节点后这里会生成当前会话的 Xray 配置。'
+                  : '当前预览长度 ${_configPreview.length} 字符。',
+              content: _configPreview,
+              emptyMessage: '还没有可预览的配置。先导入节点，再选择分流策略和运行模式。',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMacLogsWorkspace(ThemeData theme, VlessNode? node) {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final bool useWideLayout = constraints.maxWidth >= 1040;
+        final double contentHeight =
+            constraints.maxHeight.isFinite ? constraints.maxHeight : 700;
+
+        if (!useWideLayout) {
+          return SingleChildScrollView(
+            child: Column(
+              children: <Widget>[
+                _buildMacSessionSummaryPanel(theme, node),
+                const SizedBox(height: 18),
+                SizedBox(
+                  height: 360,
+                  child: _buildMacCodePanel(
+                    theme,
+                    icon: Icons.receipt_long_outlined,
+                    title: '运行日志',
+                    subtitle: _logLines.isEmpty
+                        ? '启动后日志会实时显示在这里。'
+                        : '已缓存 ${_logLines.length} 条日志。',
+                    content: _logLines.join('\n'),
+                    emptyMessage: '启动后桌面端日志会实时显示在这里。',
+                  ),
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  height: 320,
+                  child: _buildMacCodePanel(
+                    theme,
+                    icon: Icons.code_outlined,
+                    title: '当前配置',
+                    subtitle: _configPreview.isEmpty
+                        ? '还没有可预览的配置。'
+                        : '这里展示当前节点生成的 Xray JSON。',
+                    content: _configPreview,
+                    emptyMessage: '选择节点并生成配置后，这里会显示完整的 Xray JSON。',
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return SizedBox(
+          height: contentHeight,
+          child: Column(
+            children: <Widget>[
+              _buildMacSessionSummaryPanel(theme, node),
+              const SizedBox(height: 18),
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Expanded(
+                      flex: 11,
+                      child: _buildMacCodePanel(
+                        theme,
+                        icon: Icons.receipt_long_outlined,
+                        title: '运行日志',
+                        subtitle: _logLines.isEmpty
+                            ? '启动后日志会实时显示在这里。'
+                            : '已缓存 ${_logLines.length} 条日志。',
+                        content: _logLines.join('\n'),
+                        emptyMessage: '启动后桌面端日志会实时显示在这里。',
+                      ),
+                    ),
+                    const SizedBox(width: 18),
+                    Expanded(
+                      flex: 9,
+                      child: _buildMacCodePanel(
+                        theme,
+                        icon: Icons.code_outlined,
+                        title: '当前配置',
+                        subtitle: _configPreview.isEmpty
+                            ? '还没有可预览的配置。'
+                            : '这里展示当前节点生成的 Xray JSON。',
+                        content: _configPreview,
+                        emptyMessage: '选择节点并生成配置后，这里会显示完整的 Xray JSON。',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMacConnectionHero(ThemeData theme, VlessNode? node) {
+    final ColorScheme colors = theme.colorScheme;
+    final StoredNodeDraft? draft = _selectedDraft;
+
+    return _MacPanel(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            '本地代理',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: colors.onSurfaceVariant,
+              letterSpacing: 0.25,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            _statusLabel(_status),
+            style: theme.textTheme.displaySmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.8,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            node == null
+                ? '选择一个节点后即可接管系统代理，并在状态栏实时查看速率。'
+                : _tabSubtitle(_HomeTab.connection, node),
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: colors.onSurfaceVariant,
+              height: 1.45,
+            ),
+          ),
+          if (draft != null) ...<Widget>[
+            const SizedBox(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: colors.surfaceContainerHighest.withValues(alpha: 0.78),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: colors.outlineVariant.withValues(alpha: 0.9),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    _draftTitle(draft),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _draftSubtitle(draft),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 24),
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            children: <Widget>[
+              _MacMetricTile(
+                icon: Icons.arrow_upward_rounded,
+                label: '上传速率',
+                value: _formatTrafficRate(_trafficSnapshot.uploadBytesPerSecond),
+              ),
+              _MacMetricTile(
+                icon: Icons.arrow_downward_rounded,
+                label: '下载速率',
+                value:
+                    _formatTrafficRate(_trafficSnapshot.downloadBytesPerSecond),
+              ),
+              _MacMetricTile(
+                icon: Icons.alt_route_rounded,
+                label: '分流策略',
+                value: _hasSelection ? _routingPreset.label : '未选择',
+              ),
+              _MacMetricTile(
+                icon: Icons.settings_ethernet_rounded,
+                label: '工作模式',
+                value: _hasSelection ? _runtimeMode.label : '未选择',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMacCurrentNodeInspector(ThemeData theme) {
+    final ColorScheme colors = theme.colorScheme;
+    final StoredNodeDraft? draft = _selectedDraft;
+
+    return _MacPanel(
+      padding: const EdgeInsets.all(22),
+      child: draft == null
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  '当前节点',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '还没有选中的节点。导入一个节点后，连接、状态栏切换和配置生成都会跟随这里的选择。',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  '当前节点',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '这个节点会用于状态栏切换、配置生成和系统代理接管。',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                _MacDetailRow(label: '名称', value: _draftTitle(draft)),
+                _MacDetailRow(label: '地址', value: draft.node.address),
+                _MacDetailRow(
+                  label: '端口',
+                  value: draft.node.port.toString(),
+                ),
+                _MacDetailRow(
+                  label: '传输',
+                  value: _draftNetwork(draft),
+                ),
+                _MacDetailRow(
+                  label: '安全',
+                  value: _draftSecurity(draft),
+                ),
+                if (draft.node.downloadSettings != null)
+                  const _MacDetailRow(
+                    label: '下行',
+                    value: '已启用 split downloadSettings',
+                  ),
+                const SizedBox(height: 18),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: <Widget>[
+                    FilledButton.tonalIcon(
+                      onPressed: _isRuntimeLocked
+                          ? null
+                          : () {
+                              _editNode(draft);
+                            },
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('编辑节点'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _isRuntimeLocked
+                          ? null
+                          : () {
+                              _deleteNode(draft);
+                            },
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      label: const Text('删除节点'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildMacQuickActionsPanel(ThemeData theme) {
+    final ColorScheme colors = theme.colorScheme;
+
+    return _MacPanel(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            '快捷操作',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '尽量把常用动作压缩到最少的几个入口里。',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildMacImportButton(
+            fillWidth: true,
+            label: '导入或新增节点',
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonalIcon(
+              onPressed: _hasSelection && !_isRuntimeLocked
+                  ? () {
+                      _commitCollection(
+                        nodes: _savedNodes,
+                        selectedNodeId: _selectedNodeId,
+                        successStatus: 'profile-ready',
+                        showSnackOnError: true,
+                      );
+                    }
+                  : null,
+              icon: const Icon(Icons.preview_outlined, size: 18),
+              label: const Text('刷新配置预览'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              onPressed: _hasSelection && !_isRuntimeLocked
+                  ? _applyPatchFromClipboard
+                  : null,
+              icon: const Icon(Icons.merge_type_rounded, size: 18),
+              label: const Text('从剪贴板应用 split patch'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMacNodeLibraryPanel(
+    ThemeData theme, {
+    required bool fillHeight,
+  }) {
+    final ColorScheme colors = theme.colorScheme;
+
+    return _MacPanel(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            '节点库',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '保存多个节点，未连接时直接切换。连接中从状态栏切换会自动重启到新节点。',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colors.onSurfaceVariant,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildMacImportButton(
+            fillWidth: true,
+            label: '导入节点',
+          ),
+          if (_hasSelection) ...<Widget>[
+            const SizedBox(height: 6),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: _isRuntimeLocked ? null : _applyPatchFromClipboard,
+                icon: const Icon(Icons.merge_type_rounded, size: 18),
+                label: const Text('应用 split patch'),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          if (_savedNodes.isEmpty)
+            fillHeight
+                ? Expanded(
+                    child: Center(
+                      child: Text(
+                        '还没有任何节点。',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  )
+                : Text(
+                    '还没有任何节点。',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  )
+          else if (fillHeight)
+            Expanded(
+              child: Scrollbar(
+                child: ListView.separated(
+                  itemCount: _savedNodes.length,
+                  separatorBuilder: (BuildContext context, int index) =>
+                      const SizedBox(height: 10),
+                  itemBuilder: (BuildContext context, int index) {
+                    return _buildMacNodeRow(theme, _savedNodes[index]);
+                  },
+                ),
+              ),
+            )
+          else
+            Column(
+              children: _savedNodes
+                  .map(
+                    (StoredNodeDraft draft) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildMacNodeRow(theme, draft),
+                    ),
+                  )
+                  .toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMacNodeRow(ThemeData theme, StoredNodeDraft draft) {
+    final ColorScheme colors = theme.colorScheme;
+    final bool isSelected = draft.id == _selectedNodeId;
+
+    return Material(
+      color: isSelected
+          ? colors.primary.withValues(alpha: 0.09)
+          : colors.surfaceContainerLow.withValues(alpha: 0.84),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          _selectNode(draft);
+        },
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected
+                  ? colors.primary.withValues(alpha: 0.26)
+                  : colors.outlineVariant.withValues(alpha: 0.92),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Container(
+                width: 10,
+                height: 10,
+                margin: const EdgeInsets.only(top: 6),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? colors.primary
+                      : colors.outline.withValues(alpha: 0.8),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      _draftTitle(draft),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _draftSubtitle(draft),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_draftSecurity(draft)} · ${_draftNetwork(draft)} · ${draft.routingPreset.label}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<_NodeItemAction>(
+                tooltip: '节点操作',
+                onSelected: (_NodeItemAction action) {
+                  switch (action) {
+                    case _NodeItemAction.edit:
+                      _editNode(draft);
+                      break;
+                    case _NodeItemAction.delete:
+                      _deleteNode(draft);
+                      break;
+                  }
+                },
+                itemBuilder: (BuildContext context) =>
+                    <PopupMenuEntry<_NodeItemAction>>[
+                  const PopupMenuItem<_NodeItemAction>(
+                    value: _NodeItemAction.edit,
+                    child: Text('编辑'),
+                  ),
+                  const PopupMenuItem<_NodeItemAction>(
+                    value: _NodeItemAction.delete,
+                    child: Text('删除'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMacNodeDetailPanel(ThemeData theme) {
+    final ColorScheme colors = theme.colorScheme;
+    final StoredNodeDraft? draft = _selectedDraft;
+
+    return _MacPanel(
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
+      child: draft == null
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  '节点详情',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '左侧选中一个节点后，这里会展示它的连接参数和桌面端行为。',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            )
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    '节点详情',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '保持信息结构清晰，把常用编辑动作留在这一侧。',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    _draftTitle(draft),
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _draftSubtitle(draft),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <Widget>[
+                      _InfoChip(
+                        icon: Icons.shield_outlined,
+                        label: _draftSecurity(draft),
+                      ),
+                      _InfoChip(
+                        icon: Icons.swap_horiz_outlined,
+                        label: _draftNetwork(draft),
+                      ),
+                      _InfoChip(
+                        icon: Icons.alt_route_outlined,
+                        label: draft.routingPreset.label,
+                      ),
+                      _InfoChip(
+                        icon: Icons.settings_ethernet_outlined,
+                        label: draft.runtimeMode.label,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+                  Text(
+                    '连接信息',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _MacDetailRow(label: '地址', value: draft.node.address),
+                  _MacDetailRow(
+                    label: '端口',
+                    value: draft.node.port.toString(),
+                  ),
+                  _MacDetailRow(
+                    label: 'UUID',
+                    value: draft.node.id,
+                  ),
+                  if (draft.node.serverName.trim().isNotEmpty)
+                    _MacDetailRow(
+                      label: 'SNI',
+                      value: draft.node.serverName,
+                    ),
+                  if (draft.node.path.trim().isNotEmpty)
+                    _MacDetailRow(
+                      label: 'Path',
+                      value: draft.node.path,
+                    ),
+                  if (draft.node.downloadSettings != null)
+                    _MacDetailRow(
+                      label: '下行地址',
+                      value:
+                          '${draft.node.downloadSettings!.address}:${draft.node.downloadSettings!.port}',
+                    ),
+                  const SizedBox(height: 22),
+                  Text(
+                    '桌面端行为',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const _MacDetailRow(
+                    label: '系统代理',
+                    value: '连接后自动接管当前活动网络服务',
+                  ),
+                  const _MacDetailRow(
+                    label: '状态栏',
+                    value: '支持打开主窗口、切换节点、退出',
+                  ),
+                  const _MacDetailRow(
+                    label: '速率显示',
+                    value: '实时展示上下行速率',
+                  ),
+                  const SizedBox(height: 22),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: <Widget>[
+                      FilledButton.tonalIcon(
+                        onPressed: _isRuntimeLocked
+                            ? null
+                            : () {
+                                _editNode(draft);
+                              },
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('编辑'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _isRuntimeLocked
+                            ? null
+                            : () {
+                                _deleteNode(draft);
+                              },
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        label: const Text('删除'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildMacRoutingPreferencesPanel(ThemeData theme) {
+    final ColorScheme colors = theme.colorScheme;
+
+    return _MacPanel(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            '连接偏好',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _hasSelection
+                ? '这些设置会跟随当前节点保存。'
+                : '先选中一个节点，再修改它的分流策略和代理模式。',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            '分流策略',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<RoutingPreset>(
+            key: ValueKey<String>(
+                'routing-${_selectedNodeId ?? 'none'}-${_routingPreset.name}'),
+            initialValue: _routingPreset,
+            decoration: const InputDecoration(
+              labelText: '选择策略',
+            ),
+            items: RoutingPreset.values
+                .map(
+                  (RoutingPreset preset) => DropdownMenuItem<RoutingPreset>(
+                    value: preset,
+                    child: Text(preset.label),
+                  ),
+                )
+                .toList(),
+            onChanged: !_hasSelection || _isRuntimeLocked
+                ? null
+                : (RoutingPreset? value) {
+                    if (value != null) {
+                      _updateSelectedRoutingPreset(value);
+                    }
+                  },
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _routingPreset.description,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            '运行模式',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<RuntimeMode>(
+            key: ValueKey<String>(
+                'runtime-${_selectedNodeId ?? 'none'}-${_runtimeMode.name}'),
+            initialValue: _runtimeMode,
+            decoration: const InputDecoration(
+              labelText: '选择模式',
+            ),
+            items: _runtimeBridge.supportedRuntimeModes
+                .map(
+                  (RuntimeMode mode) => DropdownMenuItem<RuntimeMode>(
+                    value: mode,
+                    child: Text(mode.label),
+                  ),
+                )
+                .toList(),
+            onChanged: !_hasSelection || _isRuntimeLocked
+                ? null
+                : (RuntimeMode? value) {
+                    if (value != null) {
+                      _updateSelectedRuntimeMode(value);
+                    }
+                  },
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _runtimeBridge.runtimeModeDescription(_runtimeMode),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMacGeoDataPanel(ThemeData theme) {
+    final ColorScheme colors = theme.colorScheme;
+
+    return _MacPanel(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            '规则数据',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '应用内置 geosite/geoip 首包，连接建立后会通过本地代理在后台更新。',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colors.onSurfaceVariant,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              _InfoChip(
+                icon: Icons.inventory_2_outlined,
+                label: '内置首包 geodata',
+              ),
+              _InfoChip(
+                icon: Icons.http_outlined,
+                label: '127.0.0.1:10809',
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _hasSelection ? _updateGeoData : null,
+              icon: const Icon(Icons.travel_explore_outlined, size: 18),
+              label: const Text('立即刷新 geodata'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMacSessionSummaryPanel(ThemeData theme, VlessNode? node) {
+    final ColorScheme colors = theme.colorScheme;
+
+    return _MacPanel(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            '会话概览',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            node == null
+                ? '当前还没有可运行的节点。'
+                : '日志和配置会围绕当前节点展开，便于定位桌面端运行状态。',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              _StatusChip(
+                label: _statusLabel(_status),
+                color: _statusColor(colors, _status),
+              ),
+              _InfoChip(
+                icon: Icons.dns_outlined,
+                label: '${_savedNodes.length} 个节点',
+              ),
+              if (_hasSelection)
+                _InfoChip(
+                  icon: Icons.alt_route_outlined,
+                  label: _routingPreset.label,
+                ),
+              if (_hasSelection)
+                _InfoChip(
+                  icon: Icons.settings_ethernet_outlined,
+                  label: _runtimeMode.label,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMacCodePanel(
+    ThemeData theme, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String content,
+    required String emptyMessage,
+  }) {
+    final ColorScheme colors = theme.colorScheme;
+    final bool isEmpty = content.trim().isEmpty;
+
+    return _MacPanel(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(
+                icon,
+                size: 18,
+                color: colors.onSurfaceVariant,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colors.surfaceContainerHighest.withValues(alpha: 0.74),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: colors.outlineVariant.withValues(alpha: 0.92),
+                ),
+              ),
+              child: isEmpty
+                  ? Text(
+                      emptyMessage,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        height: 1.45,
+                      ),
+                    )
+                  : Scrollbar(
+                      child: SingleChildScrollView(
+                        child: SelectionArea(
+                          child: Text(
+                            content,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontFamily: 'monospace',
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMacImportButton({
+    required bool fillWidth,
+    required String label,
+  }) {
+    return MenuAnchor(
+      menuChildren: <Widget>[
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.content_paste_go_outlined),
+          onPressed: _isRuntimeLocked
+              ? null
+              : () => _handleImportAction(_ImportAction.clipboard),
+          child: const Text('导入链接 / outbound JSON'),
+        ),
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.merge_type_outlined),
+          onPressed: _isRuntimeLocked || !_hasSelection
+              ? null
+              : () => _handleImportAction(_ImportAction.clipboardPatch),
+          child: const Text('应用 split patch'),
+        ),
+        MenuItemButton(
+          leadingIcon: const Icon(Icons.edit_note_outlined),
+          onPressed: _isRuntimeLocked
+              ? null
+              : () => _handleImportAction(_ImportAction.manual),
+          child: const Text('手动输入 / 编辑'),
+        ),
+      ],
+      builder: (
+        BuildContext context,
+        MenuController controller,
+        Widget? child,
+      ) {
+        final Widget button = FilledButton.icon(
+          onPressed: _isRuntimeLocked
+              ? null
+              : () {
+                  if (controller.isOpen) {
+                    controller.close();
+                  } else {
+                    controller.open();
+                  }
+                },
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: Text(label),
+        );
+
+        if (fillWidth) {
+          return SizedBox(
+            width: double.infinity,
+            child: button,
+          );
+        }
+        return button;
+      },
     );
   }
 
@@ -2240,6 +3435,7 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final ColorScheme colors = theme.colorScheme;
     final double bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final bool showSecurityFields = _selectedSecurity.toLowerCase() != 'none';
     final bool showRealityFields = _selectedSecurity.toLowerCase() == 'reality';
@@ -2254,33 +3450,64 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
         showDownloadSection && _selectedDownloadSecurity.toLowerCase() == 'tls';
 
     final Widget content = Material(
-      color: theme.colorScheme.surface,
+      color: widget.desktopStyle
+          ? Colors.white.withValues(alpha: 0.94)
+          : theme.colorScheme.surface,
       borderRadius:
-          widget.desktopStyle ? BorderRadius.circular(24) : BorderRadius.zero,
+          widget.desktopStyle ? BorderRadius.circular(26) : BorderRadius.zero,
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: Column(
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+            decoration: BoxDecoration(
+              color: widget.desktopStyle
+                  ? colors.surfaceContainerLow.withValues(alpha: 0.9)
+                  : theme.colorScheme.surface,
+              border: Border(
+                bottom: BorderSide(
+                  color: colors.outlineVariant.withValues(alpha: 0.88),
+                ),
+              ),
+            ),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  widget.title,
-                  style: theme.textTheme.titleLarge,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        widget.title,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '直接编辑节点字段。基础分享链接会继续保留在上传侧参数里，split 模式的 downloadSettings 也会一并保存。',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                          height: 1.45,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '直接编辑节点字段。基础分享链接会继续保留在上传侧参数里，split 模式的 downloadSettings 也会一并保存。',
-                  style: theme.textTheme.bodyMedium,
-                ),
+                if (widget.desktopStyle)
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('取消'),
+                  ),
               ],
             ),
           ),
-          const Divider(height: 1),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               child: Form(
                 key: _formKey,
@@ -2770,15 +3997,33 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _submit,
-                icon: const Icon(Icons.download_done_outlined),
-                label: Text(widget.actionLabel),
-              ),
-            ),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: widget.desktopStyle
+                ? Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: <Widget>[
+                      OutlinedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text('取消'),
+                      ),
+                      const SizedBox(width: 10),
+                      FilledButton.icon(
+                        onPressed: _submit,
+                        icon: const Icon(Icons.download_done_outlined),
+                        label: Text(widget.actionLabel),
+                      ),
+                    ],
+                  )
+                : SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _submit,
+                      icon: const Icon(Icons.download_done_outlined),
+                      label: Text(widget.actionLabel),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -2944,11 +4189,13 @@ class _NodeEditorSection extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(isMacOS ? 18 : 24),
+        color: isMacOS
+            ? colors.surfaceContainerHighest.withValues(alpha: 0.62)
+            : colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(isMacOS ? 16 : 24),
         border: isMacOS
             ? Border.all(
-                color: colors.outlineVariant.withValues(alpha: 0.4),
+                color: colors.outlineVariant.withValues(alpha: 0.88),
               )
             : null,
       ),
@@ -2957,10 +4204,189 @@ class _NodeEditorSection extends StatelessWidget {
         children: <Widget>[
           Text(
             title,
-            style: theme.textTheme.titleMedium,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 12),
           child,
+        ],
+      ),
+    );
+  }
+}
+
+class _MacPanel extends StatelessWidget {
+  const _MacPanel({
+    required this.child,
+    this.padding = const EdgeInsets.all(20),
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme colors = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.86),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.92),
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.028),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _MacMetricTile extends StatelessWidget {
+  const _MacMetricTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme colors = theme.colorScheme;
+
+    return Container(
+      width: 228,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.92),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(
+            icon,
+            size: 18,
+            color: colors.onSurfaceVariant,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            value,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MacDetailRow extends StatelessWidget {
+  const _MacDetailRow({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme colors = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          SizedBox(
+            width: 82,
+            child: Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MacTrafficReadout extends StatelessWidget {
+  const _MacTrafficReadout({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme colors = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.92),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(
+            icon,
+            size: 14,
+            color: colors.onSurfaceVariant,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -2987,19 +4413,19 @@ class _MacSidebarItem extends StatelessWidget {
 
     return Material(
       color: selected
-          ? colors.primary.withValues(alpha: 0.12)
+          ? colors.primary.withValues(alpha: 0.1)
           : Colors.transparent,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: onPressed,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           child: Row(
             children: <Widget>[
               Icon(
                 icon,
-                size: 20,
+                size: 18,
                 color: selected ? colors.primary : colors.onSurfaceVariant,
               ),
               const SizedBox(width: 12),
@@ -3032,10 +4458,15 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.14),
+        border: Border.all(
+          color: color.withValues(alpha: 0.18),
+        ),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -3046,8 +4477,13 @@ class _StatusChip extends StatelessWidget {
             size: 10,
             color: color,
           ),
-          const SizedBox(width: 8),
-          Text(label),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -3065,12 +4501,16 @@ class _InfoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme colors = Theme.of(context).colorScheme;
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme colors = theme.colorScheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest,
+        color: colors.surfaceContainerHighest.withValues(alpha: 0.78),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.92),
+        ),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -3078,11 +4518,16 @@ class _InfoChip extends StatelessWidget {
         children: <Widget>[
           Icon(
             icon,
-            size: 18,
+            size: 16,
             color: colors.onSurfaceVariant,
           ),
-          const SizedBox(width: 8),
-          Text(label),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
