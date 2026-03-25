@@ -37,6 +37,12 @@ The repository still contains:
 - `lib/` as the legacy Flutter reference implementation;
 - `scripts/` from the earlier migration stage.
 
+The native app now treats bundled assets as a signed baseline only:
+
+- the built-in `xray` binary and bootstrap geodata are copied from the app bundle;
+- runtime updates are written into `~/Library/Application Support/xray_gui/managed/`;
+- the next runtime launch prefers those managed files, so signed `.app` contents stay untouched.
+
 ## Repository Layout
 
 ```text
@@ -72,3 +78,47 @@ This is the foundation for the next migration steps.
 - harden runtime behavior, startup validation, and recovery UX;
 - move the Packet Tunnel dataplane into the extension so VPN mode becomes truly usable;
 - finish signing, packaging, and distribution for a real macOS `.app`.
+
+## Signed Release
+
+Use `scripts/release_macos_app.sh` to archive, package, and optionally notarize the macOS app.
+The script now outputs both a `.zip` and a GitHub-friendly `.dmg`.
+
+Required environment for a real signed build:
+
+- `XRAY_GUI_DEVELOPMENT_TEAM`: your Apple Developer team id;
+- `XRAY_GUI_PRODUCT_BASE_BUNDLE_IDENTIFIER`: your own base bundle id, for example `dev.example.xraygui`;
+- optionally `XRAY_GUI_CODE_SIGN_IDENTITY`: defaults to `Developer ID Application`;
+- optionally `XRAY_GUI_DMG_VOLUME_NAME`: defaults to `Xray GUI macOS`;
+- optionally `XRAY_GUI_ALLOW_PROVISIONING_UPDATES=1` if Xcode needs to fetch/update profiles;
+- optionally `XRAY_GUI_NOTARY_PROFILE`: `notarytool` keychain profile name for notarization.
+
+Example:
+
+```bash
+XRAY_GUI_DEVELOPMENT_TEAM=ABCDE12345 \
+XRAY_GUI_PRODUCT_BASE_BUNDLE_IDENTIFIER=dev.example.xraygui \
+XRAY_GUI_NOTARY_PROFILE=xraygui-notary \
+bash ./scripts/release_macos_app.sh
+```
+
+Unsigned smoke packaging is also available for local validation:
+
+```bash
+XRAY_GUI_ALLOW_UNSIGNED=1 bash ./scripts/release_macos_app.sh
+```
+
+The release output directory will contain:
+
+- `xray_gui.app`
+- `xray_gui-macos.zip`
+- `xray_gui-macos.dmg`
+
+## Runtime Updates
+
+The native SwiftUI workspace now shows:
+
+- current effective Xray version and source;
+- latest stable Xray release from `XTLS/Xray-core`;
+- installed and latest GeoData release tags from `Loyalsoldier/v2ray-rules-dat`;
+- buttons to update the kernel and GeoData without modifying the signed app bundle.

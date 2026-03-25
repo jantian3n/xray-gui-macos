@@ -83,6 +83,10 @@ final class NativeRuntimeService {
     self.logDidEmit = logDidEmit
   }
 
+  var currentHTTPProxyPort: Int? {
+    state == .running ? activeProfile?.httpPort : nil
+  }
+
   func initialize() throws {
     let layout = try prepareLayout()
     let systemProxyManager = NativeMacosSystemProxyManager(
@@ -252,10 +256,15 @@ final class NativeRuntimeService {
     let runtimeDirectoryURL = baseDirectoryURL.appendingPathComponent("runtime", isDirectory: true)
     let geodataDirectoryURL = runtimeDirectoryURL.appendingPathComponent("geodata", isDirectory: true)
     let binaryDirectoryURL = runtimeDirectoryURL.appendingPathComponent("bin", isDirectory: true)
+    let managedDirectoryURL = baseDirectoryURL.appendingPathComponent("managed", isDirectory: true)
+    let managedGeodataDirectoryURL = managedDirectoryURL.appendingPathComponent("geodata", isDirectory: true)
+    let managedBinaryDirectoryURL = managedDirectoryURL.appendingPathComponent("bin", isDirectory: true)
 
     try fileManager.createDirectory(at: runtimeDirectoryURL, withIntermediateDirectories: true)
     try fileManager.createDirectory(at: geodataDirectoryURL, withIntermediateDirectories: true)
     try fileManager.createDirectory(at: binaryDirectoryURL, withIntermediateDirectories: true)
+    try fileManager.createDirectory(at: managedGeodataDirectoryURL, withIntermediateDirectories: true)
+    try fileManager.createDirectory(at: managedBinaryDirectoryURL, withIntermediateDirectories: true)
 
     try installBundledGeodataIfNeeded(into: geodataDirectoryURL)
 
@@ -269,19 +278,13 @@ final class NativeRuntimeService {
   private func installBundledGeodataIfNeeded(into geodataDirectoryURL: URL) throws {
     for fileName in Constants.geodataFiles {
       let targetURL = geodataDirectoryURL.appendingPathComponent(fileName)
-      if fileManager.fileExists(atPath: targetURL.path),
-         let attributes = try? fileManager.attributesOfItem(atPath: targetURL.path),
-         (attributes[.size] as? NSNumber)?.intValue ?? 0 > 0 {
-        continue
-      }
-
-      guard let sourceURL = locateAsset(relativePath: "assets/bootstrap-geodata/\(fileName)") else {
+      guard let sourceURL = resolveGeodataSource(fileName: fileName) else {
         emit("Bundled \(fileName) not found in native asset candidates.")
         continue
       }
 
       try copyIfNeeded(sourceURL: sourceURL, targetURL: targetURL, executable: false)
-      emit("Installed bundled \(fileName) from \(sourceURL.path).")
+      emit("Installed \(fileName) from \(sourceURL.path).")
     }
   }
 
@@ -293,6 +296,12 @@ final class NativeRuntimeService {
         throw NativeImportError.message("XRAY_GUI_XRAY_BINARY 指向的文件不存在: \(envURL.path)")
       }
       return envURL
+    }
+
+    if fileManager.fileExists(atPath: layout.managedBinaryURL.path) {
+      let targetURL = layout.binaryDirectoryURL.appendingPathComponent("xray")
+      try copyIfNeeded(sourceURL: layout.managedBinaryURL, targetURL: targetURL, executable: true)
+      return targetURL
     }
 
     guard let sourceURL = locateAsset(relativePath: "assets/bin/macos/xray") else {
@@ -307,59 +316,20 @@ final class NativeRuntimeService {
   }
 
   private func locateAsset(relativePath: String) -> URL? {
-    let explicitRoot = ProcessInfo.processInfo.environment[Constants.assetRootEnv]?.trimmed()
-    var baseCandidates: [URL] = []
-
-    if let explicitRoot, !explicitRoot.isEmpty {
-      baseCandidates.append(URL(fileURLWithPath: explicitRoot, isDirectory: true))
-    }
-
-    baseCandidates.append(URL(fileURLWithPath: fileManager.currentDirectoryPath, isDirectory: true))
-    baseCandidates.append(Bundle.main.bundleURL)
-    if let resourceURL = Bundle.main.resourceURL {
-      baseCandidates.append(resourceURL)
-    }
-    if let executablePath = Bundle.main.executableURL?.deletingLastPathComponent() {
-      baseCandidates.append(executablePath)
-    }
-    if let firstArgument = CommandLine.arguments.first {
-      baseCandidates.append(URL(fileURLWithPath: firstArgument).deletingLastPathComponent())
-    }
-
-    var visited = Set<String>()
-    for baseCandidate in baseCandidates {
-      for candidate in ancestorDirectories(startingAt: baseCandidate, maxDepth: 10) {
-        let candidateAssetURL = candidate.appendingPathComponent(relativePath)
-        if fileManager.fileExists(atPath: candidateAssetURL.path) {
-          return candidateAssetURL
-        }
-
-        if !relativePath.hasPrefix("assets/") {
-          let nestedAssetURL = candidate.appendingPathComponent("assets").appendingPathComponent(relativePath)
-          if fileManager.fileExists(atPath: nestedAssetURL.path) {
-            return nestedAssetURL
-          }
-        }
-
-        visited.insert(candidate.path)
-      }
-    }
-
-    return nil
+    NativeBundledAssetLocator.locate(relativePath: relativePath, fileManager: fileManager)
   }
 
-  private func ancestorDirectories(startingAt url: URL, maxDepth: Int) -> [URL] {
-    var directories: [URL] = []
-    var currentURL = url.standardizedFileURL
-    for _ in 0..<maxDepth {
-      directories.append(currentURL)
-      let nextURL = currentURL.deletingLastPathComponent()
-      if nextURL.path == currentURL.path {
-        break
-      }
-      currentURL = nextURL
+  private func resolveGeodataSource(fileName: String) -> URL? {
+    let managedURL = baseDirectoryURL
+      .appendingPathComponent("managed", isDirectory: true)
+      .appendingPathComponent("geodata", isDirectory: true)
+      .appendingPathComponent(fileName)
+    if fileManager.fileExists(atPath: managedURL.path),
+       let attributes = try? fileManager.attributesOfItem(atPath: managedURL.path),
+       (attributes[.size] as? NSNumber)?.intValue ?? 0 > 0 {
+      return managedURL
     }
-    return directories
+    return locateAsset(relativePath: "assets/bootstrap-geodata/\(fileName)")
   }
 
   private func copyIfNeeded(sourceURL: URL, targetURL: URL, executable: Bool) throws {
@@ -409,4 +379,12 @@ private struct NativeRuntimeLayout {
   let runtimeDirectoryURL: URL
   let geodataDirectoryURL: URL
   let binaryDirectoryURL: URL
+
+  var managedBinaryURL: URL {
+    runtimeDirectoryURL
+      .deletingLastPathComponent()
+      .appendingPathComponent("managed", isDirectory: true)
+      .appendingPathComponent("bin", isDirectory: true)
+      .appendingPathComponent("xray")
+  }
 }

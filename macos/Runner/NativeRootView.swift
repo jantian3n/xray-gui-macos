@@ -3,263 +3,205 @@ import SwiftUI
 struct NativeRootView: View {
   @EnvironmentObject private var appState: NativeAppState
 
+  private let connectionColumns = [
+    GridItem(.flexible(minimum: 280), spacing: 16),
+    GridItem(.flexible(minimum: 280), spacing: 16),
+  ]
+
+  private let overviewColumns = [
+    GridItem(.flexible(minimum: 180), spacing: 16),
+    GridItem(.flexible(minimum: 180), spacing: 16),
+    GridItem(.flexible(minimum: 180), spacing: 16),
+    GridItem(.flexible(minimum: 180), spacing: 16),
+  ]
+
   var body: some View {
     TabView {
-      overviewTab
+      connectionTab
         .tabItem {
-          Label("概览", systemImage: "sparkles.rectangle.stack")
+          Label("连接", systemImage: "bolt.horizontal.circle")
         }
 
-      workspaceTab
+      nodesTab
         .tabItem {
-          Label("工作台", systemImage: "hammer")
+          Label("节点", systemImage: "point.3.connected.trianglepath.dotted")
         }
 
-      migrationTab
+      diagnosticsTab
         .tabItem {
-          Label("迁移", systemImage: "arrow.triangle.2.circlepath")
-        }
-
-      notesTab
-        .tabItem {
-          Label("说明", systemImage: "note.text")
+          Label("诊断", systemImage: "waveform.path.ecg.rectangle")
         }
     }
-    .frame(minWidth: 960, minHeight: 640)
+    .frame(minWidth: 1100, minHeight: 720)
   }
 
-  private var overviewTab: some View {
+  private var connectionTab: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 20) {
-        headerCard(
-          title: "Xray GUI macOS",
-          subtitle: "原生 SwiftUI 重构已开始",
-          body: appState.statusSummary
-        )
+        heroCard
 
-        infoCard(title: "当前方向") {
-          Label("完全改为 Swift / SwiftUI 原生 macOS 应用", systemImage: "swift")
-          Label("后续用 Swift 接管运行时、系统代理和 NetworkExtension", systemImage: "network")
-          Label("Flutter 逻辑将分阶段迁移，而不是长期混跑", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right")
+        if let errorMessage = appState.lastErrorMessage {
+          errorBanner(message: errorMessage)
         }
 
-        infoCard(title: "本轮已经接管的能力") {
-          Label("原生入口已经切到 SwiftUI / AppKit", systemImage: "checkmark.circle")
-          Label("Swift 版已经能解析 `vless://` 和部分 JSON 导入", systemImage: "link.badge.plus")
-          Label("Swift 版已经能保存节点、生成 Xray JSON，并启动原生运行时", systemImage: "doc.badge.gearshape")
-          Label("Packet Tunnel 扩展骨架和宿主管理链路已经开始接入", systemImage: "point.3.filled.connected.trianglepath.dotted")
+        LazyVGrid(columns: overviewColumns, spacing: 16) {
+          metricCard(
+            title: "连接模式",
+            value: appState.selectedRuntimeMode.label,
+            detail: appState.primaryConnectionDetail,
+            tint: Color(red: 0.12, green: 0.45, blue: 0.71)
+          )
+          metricCard(
+            title: "当前状态",
+            value: appState.primaryConnectionStatusLabel,
+            detail: statusDetailText,
+            tint: statusTint
+          )
+          metricCard(
+            title: "当前节点",
+            value: appState.importedNode?.name ?? "未导入",
+            detail: appState.importedNode.map { "\($0.address):\($0.port)" } ?? "导入节点后即可连接",
+            tint: Color(red: 0.12, green: 0.56, blue: 0.38)
+          )
+          metricCard(
+            title: "Xray 内核",
+            value: appState.runtimeAssetStatus?.currentXrayVersionLabel ?? "读取中",
+            detail: appState.runtimeAssetStatus?.currentXraySourceLabel ?? "正在检查资源来源",
+            tint: Color(red: 0.77, green: 0.35, blue: 0.14)
+          )
         }
 
-        infoCard(title: "离原生可用版还差什么") {
-          Label("继续把订阅、节点编辑和配置管理完整迁到 Swift", systemImage: "shippingbox")
-          Label("继续把 Packet Tunnel 的真实数据面迁到扩展内部", systemImage: "shield.lefthalf.filled")
-          Label("补齐签名、权限和打包流程，就能更接近真正可分发的 .app", systemImage: "app.badge")
+        LazyVGrid(columns: connectionColumns, spacing: 16) {
+          connectionControlCard
+          runtimeAssetCard
+          runtimeStatusCard
+          vpnStatusCard
         }
       }
       .padding(24)
     }
   }
 
-  private var workspaceTab: some View {
+  private var nodesTab: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 20) {
-        headerCard(
-          title: "Swift 工作台",
-          subtitle: "原生业务逻辑预览",
-          body: "这里已经直接调用 Swift 版节点导入器、原生存储、xray 运行时和系统代理管理器，不再依赖 Flutter。"
-        )
+        sectionCard(title: "导入与编辑", eyebrow: "Nodes") {
+          VStack(alignment: .leading, spacing: 14) {
+            Text("支持直接粘贴 `vless://` 链接或 `client_outbound.json`。")
+              .foregroundStyle(.secondary)
 
-        infoCard(title: "导入输入") {
-          Text("可以直接粘贴 `vless://` 或 `client_outbound.json`。")
-            .foregroundStyle(.secondary)
+            TextEditor(text: $appState.importText)
+              .font(.system(.body, design: .monospaced))
+              .frame(minHeight: 220)
+              .padding(12)
+              .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                  .fill(Color(nsColor: .textBackgroundColor))
+              )
+              .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                  .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+              )
 
-          TextEditor(text: $appState.importText)
-            .font(.system(.body, design: .monospaced))
-            .frame(minHeight: 180)
-            .padding(10)
-            .background(
-              RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(nsColor: .textBackgroundColor))
-            )
-            .overlay(
-              RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.secondary.opacity(0.18), lineWidth: 1)
-            )
-
-          HStack(spacing: 12) {
-            Picker("路由策略", selection: $appState.selectedRoutingPreset) {
-              ForEach(NativeRoutingPreset.allCases) { preset in
-                Text(preset.label).tag(preset)
+            HStack(spacing: 12) {
+              Button("恢复示例") {
+                appState.resetToSample()
               }
-            }
-            .pickerStyle(.menu)
 
-            Picker("运行模式", selection: $appState.selectedRuntimeMode) {
-              ForEach(NativeRuntimeMode.allCases) { mode in
-                Text(mode.label).tag(mode)
+              Button("导入并生成配置") {
+                appState.importCurrentText()
               }
-            }
-            .pickerStyle(.menu)
+              .buttonStyle(.borderedProminent)
 
-            Spacer()
-
-            Button("恢复示例") {
-              appState.resetToSample()
+              Button("保存当前节点") {
+                appState.saveCurrentNode()
+              }
+              .disabled(appState.importedNode == nil)
             }
-
-            Button("保存当前节点") {
-              appState.saveCurrentNode()
-            }
-            .disabled(appState.importedNode == nil)
-
-            Button("导入并生成配置") {
-              appState.importCurrentText()
-            }
-            .buttonStyle(.borderedProminent)
           }
         }
 
-        infoCard(title: "运行控制") {
-          HStack {
-            Label("当前状态: \(appState.runtimeState.label)", systemImage: "bolt.horizontal.circle")
-            Spacer()
-            if appState.isRuntimeActionInFlight {
-              ProgressView()
-                .controlSize(.small)
-            }
-          }
+        LazyVGrid(columns: connectionColumns, spacing: 16) {
+          sectionCard(title: "已保存节点", eyebrow: "Library") {
+            if appState.savedNodes.isEmpty {
+              placeholderText("还没有保存的节点。")
+            } else {
+              VStack(alignment: .leading, spacing: 12) {
+                ForEach(appState.savedNodes) { draft in
+                  HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
+                      HStack(spacing: 8) {
+                        Text(draft.title)
+                          .font(.headline)
+                        if appState.selectedSavedNodeID == draft.id {
+                          capsuleLabel("当前", tint: Color.accentColor)
+                        }
+                      }
+                      Text("\(draft.node.address):\(draft.node.port)")
+                      Text("\(draft.routingPreset.label) / \(draft.runtimeMode.label)")
+                        .foregroundStyle(.secondary)
+                    }
 
-          HStack(spacing: 12) {
-            Button("启动运行时") {
-              appState.startRuntime()
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(!appState.canStartRuntime)
+                    Spacer()
 
-            Button("停止运行时") {
-              appState.stopRuntime()
-            }
-            .disabled(!appState.canStopRuntime)
-          }
-
-          if !appState.runtimeBinaryPath.isEmpty {
-            Label("xray: \(appState.runtimeBinaryPath)", systemImage: "terminal")
-              .textSelection(.enabled)
-          }
-
-          if !appState.runtimeGeodataPath.isEmpty {
-            Label("geodata: \(appState.runtimeGeodataPath)", systemImage: "tray.full")
-              .textSelection(.enabled)
-          }
-        }
-
-        infoCard(title: "Packet Tunnel") {
-          HStack {
-            Label("当前状态: \(appState.packetTunnelStatus.label)", systemImage: "shield.checkered")
-            Spacer()
-            if appState.isPacketTunnelActionInFlight {
-              ProgressView()
-                .controlSize(.small)
-            }
-          }
-
-          Text("这一块已经接进 `NetworkExtension` 的宿主控制面。当前版本会安全地阻止真正的 TUN 接管，避免数据面未完成时直接黑洞系统流量。")
-            .foregroundStyle(.secondary)
-
-          HStack(spacing: 12) {
-            Button("安装 / 更新配置") {
-              appState.installPacketTunnelConfiguration()
-            }
-            .disabled(!appState.canInstallPacketTunnel)
-
-            Button("启动 Tunnel") {
-              appState.startPacketTunnel()
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(!appState.canStartPacketTunnel)
-
-            Button("停止 Tunnel") {
-              appState.stopPacketTunnel()
-            }
-            .disabled(!appState.canStopPacketTunnel)
-          }
-
-          if !appState.packetTunnelProviderBundleIdentifier.isEmpty {
-            Label("provider bundle: \(appState.packetTunnelProviderBundleIdentifier)", systemImage: "shippingbox")
-              .textSelection(.enabled)
-          }
-        }
-
-        if !appState.savedNodes.isEmpty {
-          infoCard(title: "已保存节点") {
-            ForEach(appState.savedNodes) { draft in
-              HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                  HStack(spacing: 8) {
-                    Text(draft.title)
-                      .font(.headline)
-                    if appState.selectedSavedNodeID == draft.id {
-                      Text("当前")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.blue.opacity(0.12))
-                        .clipShape(Capsule())
+                    HStack(spacing: 8) {
+                      Button("载入") {
+                        appState.loadSavedNode(draft)
+                      }
+                      Button("删除") {
+                        appState.deleteSavedNode(draft)
+                      }
                     }
                   }
-                  Text("\(draft.node.address):\(draft.node.port)")
-                  Text("\(draft.routingPreset.label) / \(draft.runtimeMode.label)")
-                }
-
-                Spacer()
-
-                HStack(spacing: 8) {
-                  Button("载入") {
-                    appState.loadSavedNode(draft)
-                  }
-                  Button("删除") {
-                    appState.deleteSavedNode(draft)
-                  }
+                  .padding(.vertical, 4)
                 }
               }
-              .frame(maxWidth: .infinity, alignment: .leading)
-              .padding(.vertical, 6)
+            }
+          }
+
+          sectionCard(title: "节点预览", eyebrow: "Preview") {
+            if let node = appState.importedNode {
+              infoLine("名称", value: node.name, systemImage: "tag")
+              infoLine("服务器", value: "\(node.address):\(node.port)", systemImage: "server.rack")
+              infoLine(
+                "传输",
+                value: "\(node.network.uppercased()) / \(node.security.uppercased())",
+                systemImage: "network"
+              )
+              if !node.serverName.isEmpty {
+                infoLine("SNI", value: node.serverName, systemImage: "globe")
+              }
+              if !node.path.isEmpty {
+                infoLine("路径", value: node.path, systemImage: "point.3.connected.trianglepath.dotted")
+              }
+            } else {
+              placeholderText("导入节点后会在这里显示关键信息。")
             }
           }
         }
+      }
+      .padding(24)
+    }
+  }
 
-        if let errorMessage = appState.lastErrorMessage {
-          VStack(alignment: .leading, spacing: 8) {
-            Label("最近错误", systemImage: "exclamationmark.triangle.fill")
-              .font(.headline)
-              .foregroundStyle(.red)
-            Text(errorMessage)
-              .foregroundStyle(.secondary)
-          }
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(20)
-          .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-              .fill(Color.red.opacity(0.08))
-          )
-        }
-
-        if let node = appState.importedNode {
-          infoCard(title: "节点预览") {
-            Label("名称: \(node.name)", systemImage: "tag")
-            Label("服务器: \(node.address):\(node.port)", systemImage: "server.rack")
-            Label("传输: \(node.network.uppercased()) / \(node.security.uppercased())", systemImage: "network")
-            if !node.serverName.isEmpty {
-              Label("SNI: \(node.serverName)", systemImage: "globe")
+  private var diagnosticsTab: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 20) {
+        sectionCard(title: "诊断信息", eyebrow: "Diagnostics") {
+          VStack(alignment: .leading, spacing: 10) {
+            infoLine("最近刷新", value: appState.lastUpdated.formatted(date: .abbreviated, time: .shortened), systemImage: "clock")
+            infoLine("Provider Bundle", value: appState.packetTunnelProviderBundleIdentifier.isEmpty ? "未配置" : appState.packetTunnelProviderBundleIdentifier, systemImage: "shippingbox")
+            if !appState.runtimeBinaryPath.isEmpty {
+              infoLine("Xray 路径", value: appState.runtimeBinaryPath, systemImage: "terminal")
             }
-            if !node.path.isEmpty {
-              Label("路径: \(node.path)", systemImage: "point.3.connected.trianglepath.dotted")
+            if !appState.runtimeGeodataPath.isEmpty {
+              infoLine("GeoData 路径", value: appState.runtimeGeodataPath, systemImage: "tray.full")
             }
           }
         }
 
         if !appState.compiledConfigPreview.isEmpty {
-          infoCard(title: "Xray JSON 预览") {
+          sectionCard(title: "Xray 配置预览", eyebrow: "Config") {
             ScrollView(.horizontal) {
               Text(appState.compiledConfigPreview)
                 .font(.system(.footnote, design: .monospaced))
@@ -270,15 +212,17 @@ struct NativeRootView: View {
           }
         }
 
-        if !appState.runtimeLogText.isEmpty {
-          infoCard(title: "运行日志") {
+        sectionCard(title: "运行日志", eyebrow: "Logs") {
+          if appState.runtimeLogText.isEmpty {
+            placeholderText("连接、更新或导入节点后，运行日志会显示在这里。")
+          } else {
             ScrollView(.horizontal) {
               Text(appState.runtimeLogText)
                 .font(.system(.footnote, design: .monospaced))
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(minHeight: 220)
+            .frame(minHeight: 260)
           }
         }
       }
@@ -286,78 +230,36 @@ struct NativeRootView: View {
     }
   }
 
-  private var migrationTab: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
-        ForEach(appState.milestones) { milestone in
-          VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-              statusBadge(milestone.status)
-              Text(milestone.title)
-                .font(.title3.weight(.semibold))
-            }
-
-            Text(milestone.detail)
-              .foregroundStyle(.secondary)
-          }
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(20)
-          .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-              .fill(Color(nsColor: .controlBackgroundColor))
-          )
-        }
+  private var heroCard: some View {
+    HStack(alignment: .top, spacing: 20) {
+      VStack(alignment: .leading, spacing: 12) {
+        Text("Xray GUI")
+          .font(.system(size: 34, weight: .bold, design: .rounded))
+        Text("macOS 连接工作台")
+          .font(.title3.weight(.semibold))
+          .foregroundStyle(Color.white.opacity(0.9))
+        Text(appState.statusSummary)
+          .font(.body)
+          .foregroundStyle(Color.white.opacity(0.86))
       }
-      .padding(24)
-    }
-  }
 
-  private var notesTab: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 16) {
-        headerCard(
-          title: "迁移说明",
-          subtitle: "为什么先起原生壳",
-          body: "先把 App 真正变成纯 Swift 目标，后面的功能迁移才能稳定收口。"
-        )
+      Spacer()
 
-        infoCard(title: "迁移原则") {
-          ForEach(appState.notes, id: \.self) { note in
-            Label(note, systemImage: "chevron.right")
-          }
-        }
-
-        HStack {
-          Text("最近刷新")
-            .foregroundStyle(.secondary)
-          Spacer()
-          Text(appState.lastUpdated.formatted(date: .abbreviated, time: .shortened))
-            .monospacedDigit()
-        }
-        .padding(.horizontal, 4)
+      VStack(alignment: .trailing, spacing: 10) {
+        capsuleLabel(appState.selectedRuntimeMode.label, tint: Color.white)
+        capsuleLabel("状态 \(appState.primaryConnectionStatusLabel)", tint: Color.white.opacity(0.9))
+        Text(appState.lastUpdated.formatted(date: .abbreviated, time: .shortened))
+          .font(.caption.monospacedDigit())
+          .foregroundStyle(Color.white.opacity(0.75))
       }
-      .padding(24)
     }
-  }
-
-  private func headerCard(title: String, subtitle: String, body: String) -> some View {
-    VStack(alignment: .leading, spacing: 12) {
-      Text(subtitle.uppercased())
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(.secondary)
-      Text(title)
-        .font(.system(size: 30, weight: .bold, design: .rounded))
-      Text(body)
-        .font(.body)
-        .foregroundStyle(.secondary)
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(24)
+    .padding(26)
     .background(
       LinearGradient(
         colors: [
-          Color(red: 0.93, green: 0.97, blue: 0.96),
-          Color(red: 0.88, green: 0.94, blue: 0.98),
+          Color(red: 0.05, green: 0.26, blue: 0.47),
+          Color(red: 0.11, green: 0.48, blue: 0.42),
+          Color(red: 0.77, green: 0.42, blue: 0.20),
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -366,39 +268,250 @@ struct NativeRootView: View {
     .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
   }
 
-  private func infoCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-    VStack(alignment: .leading, spacing: 14) {
-      Text(title)
-        .font(.title3.weight(.semibold))
-      VStack(alignment: .leading, spacing: 12) {
-        content()
+  private var connectionControlCard: some View {
+    sectionCard(title: "连接控制", eyebrow: "Connection") {
+      VStack(alignment: .leading, spacing: 14) {
+        Picker("路由策略", selection: $appState.selectedRoutingPreset) {
+          ForEach(NativeRoutingPreset.allCases) { preset in
+            Text(preset.label).tag(preset)
+          }
+        }
+        .pickerStyle(.menu)
+
+        Text(appState.selectedRoutingPreset.description)
+          .foregroundStyle(.secondary)
+
+        Picker("连接模式", selection: $appState.selectedRuntimeMode) {
+          ForEach(NativeRuntimeMode.allCases) { mode in
+            Text(mode.label).tag(mode)
+          }
+        }
+        .pickerStyle(.segmented)
+
+        Text(appState.primaryConnectionDetail)
+          .foregroundStyle(.secondary)
+
+        HStack(spacing: 12) {
+          if appState.selectedRuntimeMode == .vpn {
+            Button("更新 VPN 配置") {
+              appState.installPacketTunnelConfiguration()
+            }
+            .disabled(!appState.canInstallPacketTunnel)
+          }
+
+          Button(startButtonTitle) {
+            appState.startSelectedConnection()
+          }
+          .buttonStyle(.borderedProminent)
+          .disabled(!appState.canStartSelectedConnection)
+
+          Button(stopButtonTitle) {
+            appState.stopSelectedConnection()
+          }
+          .disabled(!appState.canStopSelectedConnection)
+        }
       }
-      .foregroundStyle(.secondary)
+    }
+  }
+
+  private var runtimeAssetCard: some View {
+    sectionCard(title: "内核与 GeoData", eyebrow: "Runtime Assets") {
+      VStack(alignment: .leading, spacing: 10) {
+        infoLine("当前 Xray", value: appState.runtimeAssetStatus?.currentXrayVersionLabel ?? "读取中", systemImage: "cpu")
+        infoLine("最新稳定", value: appState.runtimeAssetStatus?.latestXrayVersionLabel ?? "未获取", systemImage: "arrow.down.circle")
+        infoLine("GeoData", value: appState.runtimeAssetStatus?.installedGeodataReleaseLabel ?? "读取中", systemImage: "globe.asia.australia")
+        infoLine("GeoData 最新", value: appState.runtimeAssetStatus?.latestGeodataReleaseLabel ?? "未获取", systemImage: "arrow.clockwise.circle")
+
+        if appState.isRuntimeAssetActionInFlight {
+          HStack(spacing: 8) {
+            ProgressView()
+              .controlSize(.small)
+            Text(appState.runtimeAssetActivityLabel)
+              .font(.caption)
+          }
+        }
+
+        HStack(spacing: 12) {
+          Button("刷新") {
+            appState.refreshRuntimeAssets()
+          }
+          .disabled(!appState.canManageRuntimeAssets)
+
+          Button("更新内核") {
+            appState.updateXrayCore()
+          }
+          .buttonStyle(.borderedProminent)
+          .disabled(!appState.canManageRuntimeAssets)
+
+          Button("更新 GeoData") {
+            appState.updateGeodata()
+          }
+          .disabled(!appState.canManageRuntimeAssets)
+        }
+      }
+    }
+  }
+
+  private var runtimeStatusCard: some View {
+    sectionCard(title: "本地运行时", eyebrow: "Runtime") {
+      VStack(alignment: .leading, spacing: 10) {
+        infoLine("运行状态", value: appState.runtimeState.label, systemImage: "bolt.horizontal.circle")
+        if !appState.runtimeBinaryPath.isEmpty {
+          infoLine("Xray 路径", value: appState.runtimeBinaryPath, systemImage: "terminal")
+        }
+        if !appState.runtimeGeodataPath.isEmpty {
+          infoLine("GeoData 路径", value: appState.runtimeGeodataPath, systemImage: "tray.full")
+        }
+        Text("系统代理和 VPN 模式都会复用同一套本地 Xray 运行时资源。")
+          .foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  private var vpnStatusCard: some View {
+    sectionCard(title: "VPN 托管状态", eyebrow: "NetworkExtension") {
+      VStack(alignment: .leading, spacing: 10) {
+        infoLine("VPN 状态", value: appState.packetTunnelStatus.label, systemImage: "shield.checkered")
+        infoLine("Provider", value: appState.packetTunnelProviderBundleIdentifier.isEmpty ? "未配置" : appState.packetTunnelProviderBundleIdentifier, systemImage: "shippingbox")
+        Text("VPN 模式会先启动本地 Xray，再由 Packet Tunnel 通过系统 VPN 配置接管 HTTP / HTTPS 代理。")
+          .foregroundStyle(.secondary)
+      }
+    }
+  }
+
+  private var statusTint: Color {
+    let label = appState.primaryConnectionStatusLabel
+    if label == NativeRuntimeState.running.label || label == NativePacketTunnelStatus.connected.label {
+      return Color(red: 0.12, green: 0.56, blue: 0.38)
+    }
+    if label == NativeRuntimeState.error.label
+      || label == NativePacketTunnelStatus.failed.label
+      || label == NativePacketTunnelStatus.invalid.label {
+      return Color.red
+    }
+    return Color(red: 0.86, green: 0.52, blue: 0.12)
+  }
+
+  private var statusDetailText: String {
+    if appState.selectedRuntimeMode == .vpn {
+      return "本地 Xray \(appState.runtimeState.label) / VPN \(appState.packetTunnelStatus.label)"
+    }
+    return appState.primaryConnectionDetail
+  }
+
+  private var startButtonTitle: String {
+    switch appState.selectedRuntimeMode {
+    case .vpn:
+      return "连接 VPN"
+    case .systemProxy:
+      return "连接系统代理"
+    case .localProxy:
+      return "启动本地代理"
+    }
+  }
+
+  private var stopButtonTitle: String {
+    appState.selectedRuntimeMode == .vpn ? "断开 VPN" : "停止连接"
+  }
+
+  private func sectionCard<Content: View>(
+    title: String,
+    eyebrow: String,
+    @ViewBuilder content: () -> Content
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 16) {
+      VStack(alignment: .leading, spacing: 6) {
+        Text(eyebrow.uppercased())
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(.secondary)
+        Text(title)
+          .font(.title3.weight(.semibold))
+      }
+
+      content()
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(20)
+    .padding(22)
     .background(
-      RoundedRectangle(cornerRadius: 20, style: .continuous)
+      RoundedRectangle(cornerRadius: 24, style: .continuous)
         .fill(Color(nsColor: .controlBackgroundColor))
     )
   }
 
-  private func statusBadge(_ status: NativeAppState.Milestone.Status) -> some View {
-    let tint: Color = switch status {
-    case .completed:
-      Color.green
-    case .inProgress:
-      Color.orange
-    case .pending:
-      Color.secondary
+  private func metricCard(
+    title: String,
+    value: String,
+    detail: String,
+    tint: Color
+  ) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Text(title.uppercased())
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.secondary)
+      Text(value)
+        .font(.system(size: 24, weight: .bold, design: .rounded))
+        .foregroundStyle(tint)
+        .lineLimit(2)
+      Text(detail)
+        .foregroundStyle(.secondary)
+        .lineLimit(3)
     }
+    .frame(maxWidth: .infinity, minHeight: 142, alignment: .leading)
+    .padding(20)
+    .background(
+      RoundedRectangle(cornerRadius: 22, style: .continuous)
+        .fill(Color(nsColor: .controlBackgroundColor))
+    )
+  }
 
-    return Text(status.label)
+  private func infoLine(_ title: String, value: String, systemImage: String) -> some View {
+    HStack(alignment: .top, spacing: 10) {
+      Image(systemName: systemImage)
+        .foregroundStyle(.secondary)
+        .frame(width: 18)
+      VStack(alignment: .leading, spacing: 4) {
+        Text(title)
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(.secondary)
+        Text(value)
+          .textSelection(.enabled)
+      }
+    }
+  }
+
+  private func placeholderText(_ text: String) -> some View {
+    Text(text)
+      .foregroundStyle(.secondary)
+      .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private func capsuleLabel(_ text: String, tint: Color) -> some View {
+    Text(text)
       .font(.caption.weight(.semibold))
       .padding(.horizontal, 10)
       .padding(.vertical, 6)
       .background(tint.opacity(0.14))
       .foregroundStyle(tint)
       .clipShape(Capsule())
+  }
+
+  private func errorBanner(message: String) -> some View {
+    HStack(alignment: .top, spacing: 12) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(.red)
+      VStack(alignment: .leading, spacing: 6) {
+        Text("最近错误")
+          .font(.headline)
+          .foregroundStyle(.red)
+        Text(message)
+          .foregroundStyle(.secondary)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(18)
+    .background(
+      RoundedRectangle(cornerRadius: 20, style: .continuous)
+        .fill(Color.red.opacity(0.08))
+    )
   }
 }

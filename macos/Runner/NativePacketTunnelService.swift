@@ -62,6 +62,10 @@ final class NativePacketTunnelService {
     static let providerConfigConfigJSON = "configJSON"
     static let providerConfigGeneratedAt = "generatedAt"
     static let providerConfigTunMtu = "tunMtu"
+    static let providerConfigProxyHost = "proxyHost"
+    static let providerConfigHTTPPort = "httpPort"
+    static let providerConfigSOCKSPort = "socksPort"
+    static let localhost = "127.0.0.1"
   }
 
   private let stateDidChange: (NativePacketTunnelStatus) -> Void
@@ -87,9 +91,13 @@ final class NativePacketTunnelService {
   }
 
   var providerBundleIdentifier: String {
-    let appBundleID = Bundle.main.bundleIdentifier?.trimmed()
-    let baseIdentifier = (appBundleID?.isEmpty == false)
-      ? appBundleID!
+    Self.packetTunnelBundleIdentifier(forAppBundleIdentifier: Bundle.main.bundleIdentifier)
+  }
+
+  nonisolated static func packetTunnelBundleIdentifier(forAppBundleIdentifier appBundleIdentifier: String?) -> String {
+    let trimmedIdentifier = appBundleIdentifier?.trimmed()
+    let baseIdentifier = (trimmedIdentifier?.isEmpty == false)
+      ? trimmedIdentifier!
       : "com.example.xrayGui"
     return "\(baseIdentifier)\(Constants.providerBundleSuffix)"
   }
@@ -127,6 +135,9 @@ final class NativePacketTunnelService {
       Constants.providerConfigConfigJSON: configJSONString,
       Constants.providerConfigGeneratedAt: iso8601Formatter.string(from: Date()),
       Constants.providerConfigTunMtu: profile.tunMtu,
+      Constants.providerConfigProxyHost: Constants.localhost,
+      Constants.providerConfigHTTPPort: profile.httpPort,
+      Constants.providerConfigSOCKSPort: profile.socksPort,
     ]
 
     manager.localizedDescription = Constants.localizedDescription

@@ -1,6 +1,8 @@
 import Foundation
 
 final class NativeMacosSystemProxyManager {
+  typealias NetworksetupRunner = ([String]) throws -> String
+
   private let decoder = JSONDecoder()
   private let encoder: JSONEncoder = {
     let encoder = JSONEncoder()
@@ -11,10 +13,16 @@ final class NativeMacosSystemProxyManager {
   private let emit: (String) -> Void
   private let snapshotURL: URL
   private let fileManager = FileManager.default
+  private let networksetupRunner: NetworksetupRunner
 
-  init(runtimeDirectoryURL: URL, emit: @escaping (String) -> Void) {
+  init(
+    runtimeDirectoryURL: URL,
+    emit: @escaping (String) -> Void,
+    networksetupRunner: NetworksetupRunner? = nil
+  ) {
     self.emit = emit
     snapshotURL = runtimeDirectoryURL.appendingPathComponent("system_proxy_snapshot.json")
+    self.networksetupRunner = networksetupRunner ?? Self.defaultNetworksetupRunner
   }
 
   func restoreStaleSnapshotIfNeeded() throws {
@@ -46,6 +54,7 @@ final class NativeMacosSystemProxyManager {
         String(profile.httpPort),
         "off",
       ])
+      try runNetworksetup(arguments: ["-setwebproxystate", serviceState.name, "on"])
       try runNetworksetup(arguments: [
         "-setsecurewebproxy",
         serviceState.name,
@@ -53,6 +62,7 @@ final class NativeMacosSystemProxyManager {
         String(profile.httpPort),
         "off",
       ])
+      try runNetworksetup(arguments: ["-setsecurewebproxystate", serviceState.name, "on"])
       try runNetworksetup(arguments: [
         "-setsocksfirewallproxy",
         serviceState.name,
@@ -60,6 +70,7 @@ final class NativeMacosSystemProxyManager {
         String(profile.socksPort),
         "off",
       ])
+      try runNetworksetup(arguments: ["-setsocksfirewallproxystate", serviceState.name, "on"])
       try runNetworksetup(arguments: [
         "-setproxybypassdomains",
         serviceState.name,
@@ -261,6 +272,10 @@ final class NativeMacosSystemProxyManager {
 
   @discardableResult
   private func runNetworksetup(arguments: [String]) throws -> String {
+    try networksetupRunner(arguments)
+  }
+
+  private static func defaultNetworksetupRunner(arguments: [String]) throws -> String {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/sbin/networksetup")
     process.arguments = arguments

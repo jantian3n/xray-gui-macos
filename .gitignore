@@ -8,6 +8,7 @@ build/
 # IDE
 .idea/
 .vscode/
+.DS_Store
 
 # Platform artifacts
 android/.gradle/
@@ -15,4 +16,3 @@ android/local.properties
 ios/Pods/
 ios/.symlinks/
 macos/Pods/
-
