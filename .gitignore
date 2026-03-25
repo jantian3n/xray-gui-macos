@@ -4,11 +4,12 @@
 .packages
 .pub/
 build/
+.DS_Store
 
 # IDE
 .idea/
 .vscode/
-.DS_Store
+xray_gui.iml
 
 # Platform artifacts
 android/.gradle/

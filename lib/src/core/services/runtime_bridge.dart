@@ -1,9 +1,8 @@
+import '../models/runtime_traffic_snapshot.dart';
 import '../models/runtime_mode.dart';
 import '../models/profile.dart';
 
 abstract class RuntimeBridge {
-  Future<void> initialize();
-
   List<RuntimeMode> get supportedRuntimeModes;
 
   RuntimeMode normalizeRuntimeMode(RuntimeMode mode);
@@ -21,6 +20,8 @@ abstract class RuntimeBridge {
   Future<void> updateGeoData();
 
   Stream<String> logs();
+
+  Stream<RuntimeTrafficSnapshot> traffic();
 }
 
 class UnsupportedRuntimeBridge implements RuntimeBridge {
@@ -29,18 +30,12 @@ class UnsupportedRuntimeBridge implements RuntimeBridge {
   static const String _message = '当前平台还没有接入 Xray runtime bridge。';
 
   @override
-  Future<void> initialize() async {}
-
-  @override
   List<RuntimeMode> get supportedRuntimeModes =>
-      const <RuntimeMode>[RuntimeMode.systemProxy, RuntimeMode.localProxy];
+      const <RuntimeMode>[RuntimeMode.localProxy];
 
   @override
   RuntimeMode normalizeRuntimeMode(RuntimeMode mode) {
-    if (mode == RuntimeMode.vpn) {
-      return RuntimeMode.systemProxy;
-    }
-    return mode;
+    return RuntimeMode.localProxy;
   }
 
   @override
@@ -75,4 +70,8 @@ class UnsupportedRuntimeBridge implements RuntimeBridge {
 
   @override
   Stream<String> logs() => const Stream<String>.empty();
+
+  @override
+  Stream<RuntimeTrafficSnapshot> traffic() =>
+      const Stream<RuntimeTrafficSnapshot>.empty();
 }

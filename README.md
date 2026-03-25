@@ -1,124 +1,98 @@
-# Xray GUI macOS
+# Xray GUI
 
-Native macOS rewrite of the Android-first Xray GUI project.
+Android-first Flutter shell for an Xray-based GUI client.
 
-## Current Direction
+## Current Status
 
-This repo is now moving toward a full `Swift + SwiftUI + AppKit + NetworkExtension` stack.
+This directory contains the initial app structure for:
 
-What is already in place:
+- `vless://` parsing;
+- script-style `client_outbound.json` import;
+- `client_split_patch.json` application for split XHTTP modes;
+- typed profile models;
+- Xray JSON compilation for Android VPN mode or local proxy mode, including
+  `xhttpSettings.downloadSettings` and TLS/REALITY variants;
+- method channel contracts for the Android runtime bridge;
+- a starter home screen for import, preview, and runtime actions.
 
-- the macOS app entry point is native Swift, not a Flutter window anymore;
-- the current window and menu are hosted by SwiftUI/AppKit;
-- a first Swift implementation now parses `vless://` links and script-style outbound JSON;
-- a first Swift implementation now compiles Xray JSON for macOS proxy modes;
-- saved node snapshots are now persisted by the native app;
-- the native app can now start a local `xray` subprocess and stream runtime logs;
-- `系统代理` mode now starts wiring through a native macOS proxy manager with snapshot/restore;
-- a first `PacketTunnel` NetworkExtension target is now part of the Xcode project;
-- the host app now manages Packet Tunnel preferences through `NETunnelProviderManager`;
-- the old Flutter/Dart code is still kept in the repo as migration reference.
+The Android runtime template is now present and a generated Flutter Android host can be built into a debug APK.
+The current APK is still a dry-run shell until a real `xraymobile.aar` is built and installed.
 
-What is not fully migrated yet:
+The macOS desktop host is now wired in as well, including:
 
-- subscriptions and richer profile editing;
-- deeper runtime validation and production packaging polish;
-- the actual Packet Tunnel dataplane that forwards traffic instead of only wiring the control plane.
+- local proxy runtime startup for desktop;
+- a menu bar icon with open / switch node / quit actions;
+- live upload and download speed in the macOS status bar;
+- a DMG packaging helper for later release work.
 
-## Quick Start
+## Planned Runtime Flow
 
-1. Install full Xcode on macOS.
-2. Open `macos/Runner.xcodeproj` in Xcode.
-3. Run the `Runner` target.
+1. Flutter parses a `vless://` link.
+2. Flutter compiles a profile into Xray JSON.
+3. Flutter sends the config to Android.
+4. Android starts `VpnService`.
+5. Android passes the TUN fd into the embedded Xray runtime.
+6. Logs stream back to Flutter through an event channel.
 
-The repository still contains:
-
-- `assets/bin/macos/xray` for bundled runtime experiments;
-- `lib/` as the legacy Flutter reference implementation;
-- `scripts/` from the earlier migration stage.
-
-The native app now treats bundled assets as a signed baseline only:
-
-- the built-in `xray` binary and bootstrap geodata are copied from the app bundle;
-- runtime updates are written into `~/Library/Application Support/xray_gui/managed/`;
-- the next runtime launch prefers those managed files, so signed `.app` contents stay untouched.
-
-## Repository Layout
+## Directory Layout
 
 ```text
-assets/
-  bootstrap-geodata/
-  bin/
 lib/
-  legacy Flutter/Dart reference logic
-macos/
-  native Swift macOS app target
-scripts/
-test/
+  main.dart
+  src/
+    app.dart
+    core/
+      models/
+      services/
+    features/
+      home/
 ```
 
-## Current Milestone
+## Android Native Template
 
-The native macOS shell can already:
+Native Android files currently live in:
 
-- host a real SwiftUI window;
-- accept pasted node text;
-- parse imported node content through Swift logic;
-- save imported nodes into native local storage;
-- generate a pretty-printed Xray JSON preview through Swift logic;
-- start and stop a native `xray` runtime flow;
-- install and manage a Packet Tunnel configuration from the native host app;
-- show runtime logs inside the native UI.
+```text
+android_template/
+```
 
-This is the foundation for the next migration steps.
-
-## Next Work
-
-- move subscription import and richer profile management to Swift;
-- harden runtime behavior, startup validation, and recovery UX;
-- move the Packet Tunnel dataplane into the extension so VPN mode becomes truly usable;
-- finish signing, packaging, and distribution for a real macOS `.app`.
-
-## Signed Release
-
-Use `scripts/release_macos_app.sh` to archive, package, and optionally notarize the macOS app.
-The script now outputs both a `.zip` and a GitHub-friendly `.dmg`.
-
-Required environment for a real signed build:
-
-- `XRAY_GUI_DEVELOPMENT_TEAM`: your Apple Developer team id;
-- `XRAY_GUI_PRODUCT_BASE_BUNDLE_IDENTIFIER`: your own base bundle id, for example `dev.example.xraygui`;
-- optionally `XRAY_GUI_CODE_SIGN_IDENTITY`: defaults to `Developer ID Application`;
-- optionally `XRAY_GUI_DMG_VOLUME_NAME`: defaults to `Xray GUI macOS`;
-- optionally `XRAY_GUI_ALLOW_PROVISIONING_UPDATES=1` if Xcode needs to fetch/update profiles;
-- optionally `XRAY_GUI_NOTARY_PROFILE`: `notarytool` keychain profile name for notarization.
-
-Example:
+This is intentional. Once Flutter is available, generate the Android host with:
 
 ```bash
-XRAY_GUI_DEVELOPMENT_TEAM=ABCDE12345 \
-XRAY_GUI_PRODUCT_BASE_BUNDLE_IDENTIFIER=dev.example.xraygui \
-XRAY_GUI_NOTARY_PROFILE=xraygui-notary \
-bash ./scripts/release_macos_app.sh
+flutter create --platforms android .
 ```
 
-Unsigned smoke packaging is also available for local validation:
+Then merge:
+
+```text
+android_template/app/src/main/... -> android/app/src/main/...
+```
+
+Or use:
 
 ```bash
-XRAY_GUI_ALLOW_UNSIGNED=1 bash ./scripts/release_macos_app.sh
+bash ./scripts/merge_android_template.sh
 ```
 
-The release output directory will contain:
+## Native Android Work To Add Next
 
-- `xray_gui.app`
-- `xray_gui-macos.zip`
-- `xray_gui-macos.dmg`
+- build and install `xraymobile.aar`;
+- replace dry-run VPN mode with the real embedded runtime path;
+- verify real traffic forwarding on device.
 
-## Runtime Updates
+## Debugging
 
-The native SwiftUI workspace now shows:
+See [`docs/android-debugging.md`](../../docs/android-debugging.md) for the full run and debug workflow.
 
-- current effective Xray version and source;
-- latest stable Xray release from `XTLS/Xray-core`;
-- installed and latest GeoData release tags from `Loyalsoldier/v2ray-rules-dat`;
-- buttons to update the kernel and GeoData without modifying the signed app bundle.
+## Build On macOS
+
+See [`docs/android-build-macos.md`](../../docs/android-build-macos.md) for the end-to-end macOS build path, including:
+
+- Flutter Android host generation
+- gomobile AAR build
+- AAR import into the Android app
+- APK build commands
+- the proxy-safe helper script `scripts/build_android_apk.sh`
+
+For the macOS desktop host itself, see [`macos/README.md`](./macos/README.md)
+and [`docs/desktop-build.md`](../../docs/desktop-build.md).

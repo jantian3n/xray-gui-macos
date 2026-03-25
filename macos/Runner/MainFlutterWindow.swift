@@ -1,26 +1,15 @@
 import Cocoa
-import SwiftUI
+import FlutterMacOS
 
-final class MainAppWindow: NSWindow {
-  init() {
-    super.init(
-      contentRect: NSRect(x: 0, y: 0, width: 1180, height: 780),
-      styleMask: [.titled, .closable, .miniaturizable, .resizable],
-      backing: .buffered,
-      defer: false
-    )
-    configureWindow()
-  }
+class MainFlutterWindow: NSWindow {
+  override func awakeFromNib() {
+    let flutterViewController = FlutterViewController()
+    let windowFrame = self.frame
+    self.contentViewController = flutterViewController
+    self.setFrame(windowFrame, display: true)
 
-  private func configureWindow() {
-    let nativeRootView = NativeRootView()
-      .environmentObject(NativeAppState.shared)
-    let hostingController = NSHostingController(rootView: nativeRootView)
-    contentViewController = hostingController
-    title = "Xray GUI macOS"
-    minSize = NSSize(width: 960, height: 640)
-    titlebarAppearsTransparent = false
-    toolbarStyle = .unified
-    isReleasedWhenClosed = false
+    RegisterGeneratedPlugins(registry: flutterViewController)
+
+    super.awakeFromNib()
   }
 }

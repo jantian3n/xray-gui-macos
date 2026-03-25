@@ -3,27 +3,47 @@
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(cd "${script_dir}/.." && pwd)"
-assets_root="${repo_root}/assets/bin/macos"
+repo_root="$(cd "${script_dir}/../../.." && pwd)"
+assets_root="${repo_root}/gui/xray_gui/assets/bin"
 
-source_binary="${1:-}"
-target_binary="${assets_root}/xray"
+platform="${1:-}"
+arch="${2:-}"
 
-if [[ -z "${source_binary}" ]]; then
+if [[ -z "${platform}" ]]; then
   cat <<'EOF'
 Usage:
-  bash ./scripts/build_desktop_xray.sh /absolute/path/to/xray
+  bash ./gui/xray_gui/scripts/build_desktop_xray.sh macos [arm64|amd64]
+  bash ./gui/xray_gui/scripts/build_desktop_xray.sh windows [amd64|arm64]
 EOF
   exit 1
 fi
 
-if [[ ! -f "${source_binary}" ]]; then
-  echo "Source binary not found: ${source_binary}" >&2
-  exit 1
-fi
+case "${platform}" in
+  macos)
+    goos="darwin"
+    goarch="${arch:-$(go env GOARCH)}"
+    binary_name="xray"
+    output_dir="${assets_root}/macos"
+    ;;
+  windows)
+    goos="windows"
+    goarch="${arch:-amd64}"
+    binary_name="xray.exe"
+    output_dir="${assets_root}/windows"
+    ;;
+  *)
+    echo "Unsupported platform: ${platform}" >&2
+    exit 1
+    ;;
+esac
 
-mkdir -p "${assets_root}"
-cp "${source_binary}" "${target_binary}"
-chmod +x "${target_binary}"
+mkdir -p "${output_dir}"
 
-echo "Bundled macOS xray binary into ${target_binary}"
+echo "Building xray for ${goos}/${goarch} -> ${output_dir}/${binary_name}"
+(
+  cd "${repo_root}"
+  GOOS="${goos}" GOARCH="${goarch}" CGO_ENABLED=0 \
+    go build -trimpath -o "${output_dir}/${binary_name}" ./main
+)
+
+echo "Done."

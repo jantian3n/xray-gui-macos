@@ -1,25 +1,40 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/models/profile.dart';
 import '../../../core/models/routing_preset.dart';
+import '../../../core/models/runtime_traffic_snapshot.dart';
 import '../../../core/models/runtime_mode.dart';
 import '../../../core/models/vless_node.dart';
 import '../../../core/models/xhttp_download_settings.dart';
+import '../../../core/services/macos_status_bar_controller.dart';
 import '../../../core/services/node_importer.dart';
 import '../../../core/services/runtime_bridge.dart';
 import '../../../core/services/runtime_bridge_factory.dart';
 import '../../../core/services/session_draft_store.dart';
 import '../../../core/services/xray_config_compiler.dart';
 
-enum _ImportAction { clipboard, clipboardPatch, manual }
+enum _ImportAction {
+  clipboard,
+  clipboardPatch,
+  manual,
+}
 
-enum _NodeItemAction { edit, delete }
+enum _NodeItemAction {
+  edit,
+  delete,
+}
 
-enum _HomeTab { connection, nodes, routing, logs }
+enum _HomeTab {
+  connection,
+  nodes,
+  routing,
+  logs,
+}
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -35,6 +50,7 @@ class _HomePageState extends State<HomePage> {
   final JsonEncoder _encoder = const JsonEncoder.withIndent('  ');
 
   late final RuntimeBridge _runtimeBridge;
+  MacosStatusBarController? _macosStatusBarController;
   List<StoredNodeDraft> _savedNodes = <StoredNodeDraft>[];
   String? _selectedNodeId;
   int _selectedTabIndex = 0;
@@ -43,8 +59,10 @@ class _HomePageState extends State<HomePage> {
   Profile? _profile;
   String _configPreview = '';
   String _status = 'idle';
+  RuntimeTrafficSnapshot _trafficSnapshot = const RuntimeTrafficSnapshot.zero();
   final List<String> _logLines = <String>[];
   StreamSubscription<String>? _logSubscription;
+  StreamSubscription<RuntimeTrafficSnapshot>? _trafficSubscription;
 
   StoredNodeDraft? get _selectedDraft =>
       _nodeById(_selectedNodeId, _savedNodes);
@@ -58,11 +76,25 @@ class _HomePageState extends State<HomePage> {
         'running-dry',
       }.contains(_status);
 
+  bool get _isRuntimeTransitioning => const <String>{
+        'starting',
+        'stopping',
+      }.contains(_status);
+
+  bool get _useMacDesktopLayout => Platform.isMacOS;
+
   @override
   void initState() {
     super.initState();
     _runtimeBridge = createRuntimeBridge();
     _runtimeMode = _defaultRuntimeMode();
+    if (Platform.isMacOS) {
+      _macosStatusBarController = MacosStatusBarController(
+        onSelectNode: _selectNodeFromStatusBar,
+        onQuitApp: _quitAppFromStatusBar,
+      );
+      unawaited(_initializeMacosStatusBar());
+    }
     _logSubscription = _runtimeBridge.logs().listen(
       (String line) {
         if (!mounted) {
@@ -78,6 +110,7 @@ class _HomePageState extends State<HomePage> {
             _status = state;
           }
         });
+        _scheduleMacosStatusBarSync();
       },
       onError: (Object error) {
         if (!mounted) {
@@ -88,14 +121,67 @@ class _HomePageState extends State<HomePage> {
         });
       },
     );
-    _initializeRuntimeBridge();
+    _trafficSubscription = _runtimeBridge.traffic().listen(
+      (RuntimeTrafficSnapshot snapshot) {
+        _trafficSnapshot = snapshot;
+        _scheduleMacosStatusBarSync();
+      },
+      onError: (Object error) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _logLines.insert(0, 'traffic-stream-error: $error');
+        });
+      },
+    );
     _restoreNodeCollection();
   }
 
   @override
   void dispose() {
     _logSubscription?.cancel();
+    _trafficSubscription?.cancel();
+    final MacosStatusBarController? macosStatusBarController =
+        _macosStatusBarController;
+    if (macosStatusBarController != null) {
+      unawaited(macosStatusBarController.dispose());
+    }
     super.dispose();
+  }
+
+  Future<void> _initializeMacosStatusBar() async {
+    final MacosStatusBarController? macosStatusBarController =
+        _macosStatusBarController;
+    if (macosStatusBarController == null) {
+      return;
+    }
+
+    await macosStatusBarController.initialize();
+    await _syncMacosStatusBar();
+  }
+
+  void _scheduleMacosStatusBarSync() {
+    if (!Platform.isMacOS) {
+      return;
+    }
+    unawaited(_syncMacosStatusBar());
+  }
+
+  Future<void> _syncMacosStatusBar() async {
+    final MacosStatusBarController? macosStatusBarController =
+        _macosStatusBarController;
+    if (macosStatusBarController == null) {
+      return;
+    }
+
+    await macosStatusBarController.sync(
+      nodes: _savedNodes,
+      selectedNodeId: _selectedNodeId,
+      status: _status,
+      traffic: _trafficSnapshot,
+      canSwitchNodes: !_isRuntimeTransitioning,
+    );
   }
 
   Future<void> _restoreNodeCollection() async {
@@ -110,19 +196,6 @@ class _HomePageState extends State<HomePage> {
       successStatus: 'profile-ready',
       showSnackOnError: false,
     );
-  }
-
-  Future<void> _initializeRuntimeBridge() async {
-    try {
-      await _runtimeBridge.initialize();
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _logLines.insert(0, 'runtime-init-error: $error');
-      });
-    }
   }
 
   RuntimeMode _defaultRuntimeMode() {
@@ -179,10 +252,8 @@ class _HomePageState extends State<HomePage> {
     required bool showSnackOnError,
   }) async {
     final List<StoredNodeDraft> normalizedNodes = _normalizeNodes(nodes);
-    final StoredNodeDraft? selectedDraft = _nodeById(
-      selectedNodeId,
-      normalizedNodes,
-    );
+    final StoredNodeDraft? selectedDraft =
+        _nodeById(selectedNodeId, normalizedNodes);
 
     if (selectedDraft == null) {
       if (!mounted) {
@@ -197,7 +268,11 @@ class _HomePageState extends State<HomePage> {
         _configPreview = '';
         _status = 'idle';
       });
-      await _persistNodes(nodes: normalizedNodes, selectedNodeId: null);
+      await _persistNodes(
+        nodes: normalizedNodes,
+        selectedNodeId: null,
+      );
+      _scheduleMacosStatusBarSync();
       return;
     }
 
@@ -237,6 +312,7 @@ class _HomePageState extends State<HomePage> {
       nodes: normalizedNodes,
       selectedNodeId: selectedDraft.id,
     );
+    _scheduleMacosStatusBarSync();
   }
 
   Future<void> _persistNodes({
@@ -244,11 +320,17 @@ class _HomePageState extends State<HomePage> {
     required String? selectedNodeId,
   }) async {
     await _draftStore.save(
-      StoredNodeCollection(nodes: nodes, selectedNodeId: selectedNodeId),
+      StoredNodeCollection(
+        nodes: nodes,
+        selectedNodeId: selectedNodeId,
+      ),
     );
   }
 
-  StoredNodeDraft _createDraft(VlessNode node, {StoredNodeDraft? base}) {
+  StoredNodeDraft _createDraft(
+    VlessNode node, {
+    StoredNodeDraft? base,
+  }) {
     if (node.address.trim().isEmpty) {
       throw StateError('请先填写服务器地址。');
     }
@@ -306,7 +388,10 @@ class _HomePageState extends State<HomePage> {
     }
 
     try {
-      final StoredNodeDraft updatedDraft = _createDraft(result, base: draft);
+      final StoredNodeDraft updatedDraft = _createDraft(
+        result,
+        base: draft,
+      );
       final List<StoredNodeDraft> nodes = _savedNodes
           .map(
             (StoredNodeDraft node) => node.id == draft.id ? updatedDraft : node,
@@ -349,6 +434,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _selectNode(StoredNodeDraft draft) async {
+    if (_isRuntimeTransitioning) {
+      if (draft.id != _selectedNodeId) {
+        _showSnackBar('连接状态切换中，请稍后再试。');
+      }
+      return;
+    }
+
     if (_isRuntimeLocked) {
       if (draft.id != _selectedNodeId) {
         _showSnackBar('运行中请先停止连接，再切换节点。');
@@ -362,6 +454,58 @@ class _HomePageState extends State<HomePage> {
       successStatus: 'profile-ready',
       showSnackOnError: true,
     );
+  }
+
+  Future<void> _selectNodeFromStatusBar(String nodeId) async {
+    final StoredNodeDraft? draft = _nodeById(nodeId, _savedNodes);
+    if (draft == null || draft.id == _selectedNodeId) {
+      return;
+    }
+
+    if (_isRuntimeTransitioning) {
+      return;
+    }
+
+    if (_status == 'running') {
+      await _restartRuntimeWithNode(draft);
+      return;
+    }
+
+    await _commitCollection(
+      nodes: _savedNodes,
+      selectedNodeId: draft.id,
+      successStatus: 'profile-ready',
+      showSnackOnError: false,
+    );
+  }
+
+  Future<void> _restartRuntimeWithNode(StoredNodeDraft draft) async {
+    try {
+      if (mounted) {
+        setState(() {
+          _status = 'stopping';
+        });
+      }
+      _scheduleMacosStatusBarSync();
+      await _runtimeBridge.stop();
+      if (!mounted) {
+        return;
+      }
+
+      await _commitCollection(
+        nodes: _savedNodes,
+        selectedNodeId: draft.id,
+        successStatus: 'profile-ready',
+        showSnackOnError: false,
+      );
+      if (!mounted) {
+        return;
+      }
+
+      await _startRuntime();
+    } catch (error) {
+      _showSnackBar(error.toString());
+    }
   }
 
   Future<void> _updateSelectedRoutingPreset(RoutingPreset preset) async {
@@ -470,6 +614,31 @@ class _HomePageState extends State<HomePage> {
     required String actionLabel,
     VlessNode? initialNode,
   }) async {
+    if (_useMacDesktopLayout) {
+      return showDialog<VlessNode>(
+        context: context,
+        barrierDismissible: true,
+        builder: (BuildContext context) {
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 32,
+              vertical: 24,
+            ),
+            child: SizedBox(
+              width: 860,
+              height: 760,
+              child: _NodeEditorSheet(
+                title: title,
+                actionLabel: actionLabel,
+                initialNode: initialNode,
+                desktopStyle: true,
+              ),
+            ),
+          );
+        },
+      );
+    }
+
     return showModalBottomSheet<VlessNode>(
       context: context,
       isScrollControlled: true,
@@ -480,6 +649,7 @@ class _HomePageState extends State<HomePage> {
           title: title,
           actionLabel: actionLabel,
           initialNode: initialNode,
+          desktopStyle: false,
         );
       },
     );
@@ -546,8 +716,9 @@ class _HomePageState extends State<HomePage> {
         _configPreview = compiled.configPreview;
         _status = 'starting';
       });
+      _scheduleMacosStatusBarSync();
     } on MissingPluginException {
-      _showSnackBar('macOS runtime bridge 还没有接入完成。');
+      _showSnackBar('当前平台的运行桥接尚未接入完成。');
     } catch (error) {
       _showSnackBar(error.toString());
     }
@@ -559,8 +730,9 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _status = 'stopping';
       });
+      _scheduleMacosStatusBarSync();
     } on MissingPluginException {
-      _showSnackBar('macOS runtime bridge 还没有接入完成。');
+      _showSnackBar('当前平台的运行桥接尚未接入完成。');
     } catch (error) {
       _showSnackBar(error.toString());
     }
@@ -571,19 +743,31 @@ class _HomePageState extends State<HomePage> {
       await _runtimeBridge.updateGeoData();
       _showSnackBar('已请求更新 geodata。');
     } on MissingPluginException {
-      _showSnackBar('macOS runtime bridge 还没有接入完成。');
+      _showSnackBar('当前平台的运行桥接尚未接入完成。');
     } catch (error) {
       _showSnackBar(error.toString());
     }
+  }
+
+  Future<void> _quitAppFromStatusBar() async {
+    try {
+      if (_isRuntimeLocked) {
+        await _runtimeBridge.stop();
+      }
+    } catch (_) {
+      // Keep quitting even if the runtime is already gone.
+    }
+
+    await _macosStatusBarController?.terminateApp();
   }
 
   void _showSnackBar(String message) {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   String? _extractStateFromLogLine(String line) {
@@ -606,8 +790,22 @@ class _HomePageState extends State<HomePage> {
     final VlessNode? node = _profile?.node ?? _selectedDraft?.node;
     final _HomeTab currentTab = _HomeTab.values[_selectedTabIndex];
 
+    if (_useMacDesktopLayout) {
+      return _buildMacDesktopShell(theme, node, currentTab);
+    }
+
+    return _buildMobileShell(theme, node, currentTab);
+  }
+
+  Widget _buildMobileShell(
+    ThemeData theme,
+    VlessNode? node,
+    _HomeTab currentTab,
+  ) {
     return Scaffold(
-      appBar: AppBar(title: Text(_tabTitle(currentTab))),
+      appBar: AppBar(
+        title: Text(_tabTitle(currentTab)),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTabIndex,
         onDestinationSelected: (int index) {
@@ -651,6 +849,116 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildMacDesktopShell(
+    ThemeData theme,
+    VlessNode? node,
+    _HomeTab currentTab,
+  ) {
+    final ColorScheme colors = theme.colorScheme;
+
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: SafeArea(
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 250,
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.72),
+                border: Border(
+                  right: BorderSide(
+                    color: colors.outlineVariant.withValues(alpha: 0.45),
+                  ),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  _buildMacSidebarHeader(theme),
+                  const SizedBox(height: 20),
+                  ..._HomeTab.values.map(
+                    (_HomeTab tab) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _MacSidebarItem(
+                        icon: _tabIcon(tab),
+                        label: _tabTitle(tab),
+                        selected: tab == currentTab,
+                        onPressed: () {
+                          setState(() {
+                            _selectedTabIndex = tab.index;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (_selectedDraft != null)
+                    _buildMacSidebarNodeSummary(theme),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: _isRuntimeLocked
+                              ? null
+                              : () {
+                                  _handleImportAction(_ImportAction.clipboard);
+                                },
+                          icon: const Icon(Icons.add_link_outlined),
+                          label: const Text('导入'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isRuntimeLocked
+                              ? null
+                              : () {
+                                  _handleImportAction(_ImportAction.manual);
+                                },
+                          icon: const Icon(Icons.edit_note_outlined),
+                          label: const Text('手动'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Column(
+                children: <Widget>[
+                  _buildMacToolbar(theme, currentTab, node),
+                  Expanded(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      child: Align(
+                        key: ValueKey<_HomeTab>(currentTab),
+                        alignment: Alignment.topCenter,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 1120),
+                          child: ListView(
+                            padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+                            children: _buildTabChildren(
+                              currentTab,
+                              theme,
+                              node,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   List<Widget> _buildTabChildren(
     _HomeTab tab,
     ThemeData theme,
@@ -658,6 +966,46 @@ class _HomePageState extends State<HomePage> {
   ) {
     switch (tab) {
       case _HomeTab.connection:
+        if (_useMacDesktopLayout) {
+          return <Widget>[
+            LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints constraints) {
+                final bool useWideCards = constraints.maxWidth >= 920;
+                if (!useWideCards) {
+                  return Column(
+                    children: <Widget>[
+                      _buildOverviewCard(theme, node),
+                      const SizedBox(height: 16),
+                      _buildCurrentNodeCard(theme),
+                      const SizedBox(height: 16),
+                      _buildActionsCard(),
+                    ],
+                  );
+                }
+
+                return Wrap(
+                  spacing: 16,
+                  runSpacing: 16,
+                  children: <Widget>[
+                    SizedBox(
+                      width: (constraints.maxWidth - 16) / 2,
+                      child: _buildOverviewCard(theme, node),
+                    ),
+                    SizedBox(
+                      width: (constraints.maxWidth - 16) / 2,
+                      child: _buildCurrentNodeCard(theme),
+                    ),
+                    SizedBox(
+                      width: constraints.maxWidth,
+                      child: _buildActionsCard(),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ];
+        }
+
         return <Widget>[
           _buildOverviewCard(theme, node),
           const SizedBox(height: 12),
@@ -666,8 +1014,50 @@ class _HomePageState extends State<HomePage> {
           _buildActionsCard(),
         ];
       case _HomeTab.nodes:
-        return <Widget>[_buildNodeListCard(theme)];
+        return <Widget>[
+          _buildNodeListCard(theme),
+        ];
       case _HomeTab.routing:
+        if (_useMacDesktopLayout) {
+          return <Widget>[
+            LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints constraints) {
+                final bool useWideCards = constraints.maxWidth >= 920;
+                if (!useWideCards) {
+                  return Column(
+                    children: <Widget>[
+                      _buildPreferencesCard(theme),
+                      const SizedBox(height: 16),
+                      _buildGeoDataCard(theme),
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Expanded(child: _buildPreferencesCard(theme)),
+                    const SizedBox(width: 16),
+                    Expanded(child: _buildGeoDataCard(theme)),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            _buildExpandablePanel(
+              context: context,
+              icon: Icons.code_outlined,
+              title: '生成配置',
+              subtitle: _configPreview.isEmpty
+                  ? '选择节点后查看生成的 Xray 配置'
+                  : '当前预览长度 ${_configPreview.length} 字符',
+              content: _configPreview.isEmpty
+                  ? '还没有可预览的配置。先导入一个节点，再调整分流策略和本地代理模式。'
+                  : _configPreview,
+            ),
+          ];
+        }
+
         return <Widget>[
           _buildPreferencesCard(theme),
           const SizedBox(height: 12),
@@ -688,7 +1078,7 @@ class _HomePageState extends State<HomePage> {
       case _HomeTab.logs:
         return <Widget>[
           _buildOverviewCard(theme, node),
-          const SizedBox(height: 12),
+          SizedBox(height: _useMacDesktopLayout ? 16 : 12),
           _buildExpandablePanel(
             context: context,
             icon: Icons.receipt_long_outlined,
@@ -696,12 +1086,194 @@ class _HomePageState extends State<HomePage> {
             subtitle: _logLines.isEmpty
                 ? '启动后日志会显示在这里'
                 : '已缓存 ${_logLines.length} 条日志',
-            content: _logLines.isEmpty
-                ? '启动 macOS runtime 后，日志会实时显示在这里。'
-                : _logLines.join('\n'),
+            content:
+                _logLines.isEmpty ? '启动后桌面端日志会实时显示在这里。' : _logLines.join('\n'),
           ),
         ];
     }
+  }
+
+  Widget _buildMacSidebarHeader(ThemeData theme) {
+    final ColorScheme colors = theme.colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.84),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.45),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'Xray for macOS',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '状态栏常驻、本地代理模式、节点切换与实时速率。',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              _StatusChip(
+                label: _statusLabel(_status),
+                color: _statusColor(colors, _status),
+              ),
+              if (_hasSelection)
+                _InfoChip(
+                  icon: Icons.upload_rounded,
+                  label:
+                      _formatTrafficRate(_trafficSnapshot.uploadBytesPerSecond),
+                ),
+              if (_hasSelection)
+                _InfoChip(
+                  icon: Icons.download_rounded,
+                  label: _formatTrafficRate(
+                      _trafficSnapshot.downloadBytesPerSecond),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMacSidebarNodeSummary(ThemeData theme) {
+    final ColorScheme colors = theme.colorScheme;
+    final StoredNodeDraft? draft = _selectedDraft;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      child: draft == null
+          ? Text(
+              '还没有选中的节点。',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  '当前节点',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _draftTitle(draft),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _draftSubtitle(draft),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildMacToolbar(
+    ThemeData theme,
+    _HomeTab currentTab,
+    VlessNode? node,
+  ) {
+    final ColorScheme colors = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.5),
+        border: Border(
+          bottom: BorderSide(
+            color: colors.outlineVariant.withValues(alpha: 0.4),
+          ),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  _tabTitle(currentTab),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _tabSubtitle(currentTab, node),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_hasSelection) ...<Widget>[
+            _InfoChip(
+              icon: Icons.upload_rounded,
+              label: _formatTrafficRate(_trafficSnapshot.uploadBytesPerSecond),
+            ),
+            const SizedBox(width: 10),
+            _InfoChip(
+              icon: Icons.download_rounded,
+              label:
+                  _formatTrafficRate(_trafficSnapshot.downloadBytesPerSecond),
+            ),
+            const SizedBox(width: 14),
+          ],
+          OutlinedButton.icon(
+            onPressed: const <String>{'starting', 'running', 'running-dry'}
+                    .contains(_status)
+                ? _stopRuntime
+                : null,
+            icon: const Icon(Icons.stop_circle_outlined),
+            label: const Text('停止'),
+          ),
+          const SizedBox(width: 10),
+          FilledButton.icon(
+            onPressed:
+                _hasSelection && !_isRuntimeLocked ? _startRuntime : null,
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: Text(_status == 'running' ? '已连接' : '连接'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildOverviewCard(ThemeData theme, VlessNode? node) {
@@ -713,10 +1285,15 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text('连接概览', style: theme.textTheme.titleLarge),
+            Text(
+              _useMacDesktopLayout ? '桌面代理概览' : '连接概览',
+              style: theme.textTheme.titleLarge,
+            ),
             const SizedBox(height: 8),
             Text(
-              '面向 macOS 的 Xray 控制面板，支持单机 XHTTP、分离上下行 XHTTP，以及脚本导出的 REALITY/TLS 模式。',
+              _useMacDesktopLayout
+                  ? '为 macOS 桌面整理的 Xray 控制台，支持状态栏驻留、实时上下行速率、节点切换，以及本地代理模式。'
+                  : '面向 Android 的 Xray 控制面板，支持单机 XHTTP、分离上下行 XHTTP，以及脚本导出的 REALITY/TLS 模式。',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colors.onSurfaceVariant,
               ),
@@ -743,6 +1320,20 @@ class _HomePageState extends State<HomePage> {
                   _InfoChip(
                     icon: Icons.settings_ethernet_outlined,
                     label: _runtimeMode.label,
+                  ),
+                if (_hasSelection)
+                  _InfoChip(
+                    icon: Icons.upload_rounded,
+                    label: _formatTrafficRate(
+                      _trafficSnapshot.uploadBytesPerSecond,
+                    ),
+                  ),
+                if (_hasSelection)
+                  _InfoChip(
+                    icon: Icons.download_rounded,
+                    label: _formatTrafficRate(
+                      _trafficSnapshot.downloadBytesPerSecond,
+                    ),
                   ),
                 if (node != null)
                   _InfoChip(
@@ -777,12 +1368,19 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text('当前节点', style: theme.textTheme.titleLarge),
+            Text(
+              _useMacDesktopLayout ? '当前工作节点' : '当前节点',
+              style: theme.textTheme.titleLarge,
+            ),
             const SizedBox(height: 8),
             Text(
               selectedDraft == null
-                  ? '还没有选中的节点。先从下方导入一个节点。'
-                  : '启动、预览和分流配置都会基于当前节点进行。',
+                  ? (_useMacDesktopLayout
+                      ? '还没有选中的节点。先导入一个节点，再开始本地代理连接。'
+                      : '还没有选中的节点。先从下方导入一个节点。')
+                  : (_useMacDesktopLayout
+                      ? '启动连接、状态栏切换和配置生成都会基于当前节点进行。'
+                      : '启动、预览和分流配置都会基于当前节点进行。'),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colors.onSurfaceVariant,
               ),
@@ -797,7 +1395,9 @@ class _HomePageState extends State<HomePage> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '点击“导入节点”，可以从剪贴板读取 `vless://`、`client_outbound.json`，或对当前节点应用 `client_split_patch.json`。',
+                  _useMacDesktopLayout
+                      ? '点击左下角“导入”或“手动”，可以从剪贴板读取 `vless://`、`client_outbound.json`，也可以对当前节点应用 `client_split_patch.json`。'
+                      : '点击“导入节点”，可以从剪贴板读取 `vless://`、`client_outbound.json`，或对当前节点应用 `client_split_patch.json`。',
                   style: theme.textTheme.bodyMedium,
                 ),
               )
@@ -890,10 +1490,15 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text('节点列表', style: theme.textTheme.titleLarge),
+            Text(
+              _useMacDesktopLayout ? '已保存的节点' : '节点列表',
+              style: theme.textTheme.titleLarge,
+            ),
             const SizedBox(height: 8),
             Text(
-              '保存多个节点，本地切换当前选中节点。运行中会锁定切换和编辑，避免状态混乱。',
+              _useMacDesktopLayout
+                  ? '在桌面端保存多个节点。未连接时可直接切换；连接中从状态栏切换会自动重启到新节点。'
+                  : '保存多个节点，本地切换当前选中节点。运行中会锁定切换和编辑，避免状态混乱。',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colors.onSurfaceVariant,
               ),
@@ -953,7 +1558,7 @@ class _HomePageState extends State<HomePage> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '还没有已保存的节点。',
+                  _useMacDesktopLayout ? '还没有任何节点。' : '还没有已保存的节点。',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colors.onSurfaceVariant,
                   ),
@@ -1093,10 +1698,19 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text('运行偏好', style: theme.textTheme.titleLarge),
+            Text(
+              _useMacDesktopLayout ? '连接偏好' : '运行偏好',
+              style: theme.textTheme.titleLarge,
+            ),
             const SizedBox(height: 8),
             Text(
-              _hasSelection ? '当前设置会保存到选中的节点里。' : '先选中一个节点，再修改它的分流策略和运行模式。',
+              _hasSelection
+                  ? (_useMacDesktopLayout
+                      ? '这些设置会跟随当前节点一起保存。'
+                      : '当前设置会保存到选中的节点里。')
+                  : (_useMacDesktopLayout
+                      ? '先选中一个节点，再修改它的分流策略和代理模式。'
+                      : '先选中一个节点，再修改它的分流策略和运行模式。'),
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colors.onSurfaceVariant,
               ),
@@ -1104,10 +1718,11 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 16),
             DropdownButtonFormField<RoutingPreset>(
               key: ValueKey<String>(
-                'routing-${_selectedNodeId ?? 'none'}-${_routingPreset.name}',
-              ),
+                  'routing-${_selectedNodeId ?? 'none'}-${_routingPreset.name}'),
               initialValue: _routingPreset,
-              decoration: const InputDecoration(labelText: '分流策略'),
+              decoration: const InputDecoration(
+                labelText: '分流策略',
+              ),
               items: RoutingPreset.values
                   .map(
                     (RoutingPreset preset) => DropdownMenuItem<RoutingPreset>(
@@ -1134,10 +1749,11 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 16),
             DropdownButtonFormField<RuntimeMode>(
               key: ValueKey<String>(
-                'runtime-${_selectedNodeId ?? 'none'}-${_runtimeMode.name}',
-              ),
+                  'runtime-${_selectedNodeId ?? 'none'}-${_runtimeMode.name}'),
               initialValue: _runtimeMode,
-              decoration: const InputDecoration(labelText: '运行模式'),
+              decoration: const InputDecoration(
+                labelText: '运行模式',
+              ),
               items: _runtimeBridge.supportedRuntimeModes
                   .map(
                     (RuntimeMode mode) => DropdownMenuItem<RuntimeMode>(
@@ -1176,10 +1792,15 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text('规则数据', style: theme.textTheme.titleLarge),
+            Text(
+              _useMacDesktopLayout ? '规则数据与更新' : '规则数据',
+              style: theme.textTheme.titleLarge,
+            ),
             const SizedBox(height: 8),
             Text(
-              '应用内置一份启动用 geosite/geoip，首次启动不再依赖外网下载。连接建立后，会通过本地 HTTP 代理后台刷新规则数据。',
+              _useMacDesktopLayout
+                  ? '应用内置一份启动用 geosite/geoip，首次启动不依赖外网下载。连接建立后，会通过本地 HTTP 代理在后台刷新规则数据。'
+                  : '应用内置一份启动用 geosite/geoip，首次启动不再依赖外网下载。连接建立后，会通过本地 HTTP 代理后台刷新规则数据。',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colors.onSurfaceVariant,
               ),
@@ -1193,7 +1814,10 @@ class _HomePageState extends State<HomePage> {
                   icon: Icons.inventory_2_outlined,
                   label: '内置首包 geodata',
                 ),
-                _InfoChip(icon: Icons.http_outlined, label: '127.0.0.1:10809'),
+                _InfoChip(
+                  icon: Icons.http_outlined,
+                  label: '127.0.0.1:10809',
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -1218,7 +1842,10 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text('操作', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              _useMacDesktopLayout ? '快速操作' : '操作',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -1226,7 +1853,7 @@ class _HomePageState extends State<HomePage> {
                 onPressed:
                     _hasSelection && !_isRuntimeLocked ? _startRuntime : null,
                 icon: const Icon(Icons.shield_outlined),
-                label: const Text('启动连接'),
+                label: Text(_useMacDesktopLayout ? '启动本地代理' : '启动连接'),
               ),
             ),
             const SizedBox(height: 12),
@@ -1251,15 +1878,12 @@ class _HomePageState extends State<HomePage> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: const <String>{
-                  'starting',
-                  'running',
-                  'running-dry',
-                }.contains(_status)
+                onPressed: const <String>{'starting', 'running', 'running-dry'}
+                        .contains(_status)
                     ? _stopRuntime
                     : null,
                 icon: const Icon(Icons.stop_circle_outlined),
-                label: const Text('停止连接'),
+                label: Text(_useMacDesktopLayout ? '停止代理' : '停止连接'),
               ),
             ),
           ],
@@ -1331,6 +1955,26 @@ class _HomePageState extends State<HomePage> {
     return draft.node.network.toUpperCase();
   }
 
+  String _formatTrafficRate(int bytesPerSecond) {
+    if (bytesPerSecond < 1024) {
+      return '${bytesPerSecond}B/s';
+    }
+
+    final double kilobytes = bytesPerSecond / 1024;
+    if (kilobytes < 1024) {
+      if (kilobytes >= 100) {
+        return '${kilobytes.round()}KB/s';
+      }
+      return '${kilobytes.toStringAsFixed(kilobytes >= 10 ? 1 : 2)}KB/s';
+    }
+
+    final double megabytes = kilobytes / 1024;
+    if (megabytes >= 100) {
+      return '${megabytes.round()}MB/s';
+    }
+    return '${megabytes.toStringAsFixed(megabytes >= 10 ? 1 : 2)}MB/s';
+  }
+
   String _statusLabel(String status) {
     switch (status) {
       case 'profile-ready':
@@ -1384,6 +2028,36 @@ class _HomePageState extends State<HomePage> {
         return '日志';
     }
   }
+
+  String _tabSubtitle(_HomeTab tab, VlessNode? node) {
+    final StoredNodeDraft? selectedDraft = _selectedDraft;
+
+    switch (tab) {
+      case _HomeTab.connection:
+        return node == null
+            ? '选择一个节点后即可启动本地代理。'
+            : '当前节点 ${selectedDraft == null ? _profile?.name ?? '未命名节点' : _draftTitle(selectedDraft)}，可在状态栏查看实时速率。';
+      case _HomeTab.nodes:
+        return '导入、编辑和切换保存的节点。';
+      case _HomeTab.routing:
+        return '调整分流策略、代理模式和规则数据。';
+      case _HomeTab.logs:
+        return '查看当前会话的运行日志与生成配置。';
+    }
+  }
+
+  IconData _tabIcon(_HomeTab tab) {
+    switch (tab) {
+      case _HomeTab.connection:
+        return Icons.bolt_rounded;
+      case _HomeTab.nodes:
+        return Icons.lan_rounded;
+      case _HomeTab.routing:
+        return Icons.tune_rounded;
+      case _HomeTab.logs:
+        return Icons.receipt_long_rounded;
+    }
+  }
 }
 
 class _CompiledDraft {
@@ -1403,11 +2077,13 @@ class _NodeEditorSheet extends StatefulWidget {
     required this.title,
     required this.actionLabel,
     this.initialNode,
+    required this.desktopStyle,
   });
 
   final String title;
   final String actionLabel;
   final VlessNode? initialNode;
+  final bool desktopStyle;
 
   @override
   State<_NodeEditorSheet> createState() => _NodeEditorSheetState();
@@ -1463,25 +2139,22 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
     final XhttpDownloadSettings? initialDownload =
         _initialNode.downloadSettings;
 
-    _networkOptions = _buildOptions(const <String>[
-      'xhttp',
-      'tcp',
-      'grpc',
-      'ws',
-    ], _initialNode.network);
-    _securityOptions = _buildOptions(const <String>[
-      'reality',
-      'tls',
-      'none',
-    ], _initialNode.security);
-    _downloadNetworkOptions = _buildOptions(const <String>[
-      'xhttp',
-    ], initialDownload?.network ?? 'xhttp');
-    _downloadSecurityOptions = _buildOptions(const <String>[
-      'reality',
-      'tls',
-      'none',
-    ], initialDownload?.security ?? _initialNode.security);
+    _networkOptions = _buildOptions(
+      const <String>['xhttp', 'tcp', 'grpc', 'ws'],
+      _initialNode.network,
+    );
+    _securityOptions = _buildOptions(
+      const <String>['reality', 'tls', 'none'],
+      _initialNode.security,
+    );
+    _downloadNetworkOptions = _buildOptions(
+      const <String>['xhttp'],
+      initialDownload?.network ?? 'xhttp',
+    );
+    _downloadSecurityOptions = _buildOptions(
+      const <String>['reality', 'tls', 'none'],
+      initialDownload?.security ?? _initialNode.security,
+    );
 
     _selectedNetwork = _initialNode.network;
     _selectedSecurity = _initialNode.security;
@@ -1494,16 +2167,13 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
     _addressController = TextEditingController(text: _initialNode.address);
     _portController = TextEditingController(text: _initialNode.port.toString());
     _idController = TextEditingController(text: _initialNode.id);
-    _encryptionController = TextEditingController(
-      text: _initialNode.encryption,
-    );
+    _encryptionController =
+        TextEditingController(text: _initialNode.encryption);
     _flowController = TextEditingController(text: _initialNode.flow);
-    _serverNameController = TextEditingController(
-      text: _initialNode.serverName,
-    );
-    _fingerprintController = TextEditingController(
-      text: _initialNode.fingerprint,
-    );
+    _serverNameController =
+        TextEditingController(text: _initialNode.serverName);
+    _fingerprintController =
+        TextEditingController(text: _initialNode.fingerprint);
     _publicKeyController = TextEditingController(text: _initialNode.publicKey);
     _shortIdController = TextEditingController(text: _initialNode.shortId);
     _spiderXController = TextEditingController(text: _initialNode.spiderX);
@@ -1511,39 +2181,29 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
     _pathController = TextEditingController(text: _initialNode.path);
     _modeController = TextEditingController(text: _initialNode.mode);
     _alpnController = TextEditingController(text: _initialNode.alpn.join(','));
-    _downloadAddressController = TextEditingController(
-      text: initialDownload?.address ?? '',
-    );
+    _downloadAddressController =
+        TextEditingController(text: initialDownload?.address ?? '');
     _downloadPortController = TextEditingController(
       text: (initialDownload?.port ?? _initialNode.port).toString(),
     );
-    _downloadServerNameController = TextEditingController(
-      text: initialDownload?.serverName ?? '',
-    );
-    _downloadFingerprintController = TextEditingController(
-      text: initialDownload?.fingerprint ?? '',
-    );
-    _downloadPublicKeyController = TextEditingController(
-      text: initialDownload?.publicKey ?? '',
-    );
-    _downloadShortIdController = TextEditingController(
-      text: initialDownload?.shortId ?? '',
-    );
-    _downloadSpiderXController = TextEditingController(
-      text: initialDownload?.spiderX ?? '',
-    );
-    _downloadHostController = TextEditingController(
-      text: initialDownload?.host ?? '',
-    );
-    _downloadPathController = TextEditingController(
-      text: initialDownload?.path ?? '',
-    );
-    _downloadModeController = TextEditingController(
-      text: initialDownload?.mode ?? '',
-    );
-    _downloadAlpnController = TextEditingController(
-      text: initialDownload?.alpn.join(',') ?? '',
-    );
+    _downloadServerNameController =
+        TextEditingController(text: initialDownload?.serverName ?? '');
+    _downloadFingerprintController =
+        TextEditingController(text: initialDownload?.fingerprint ?? '');
+    _downloadPublicKeyController =
+        TextEditingController(text: initialDownload?.publicKey ?? '');
+    _downloadShortIdController =
+        TextEditingController(text: initialDownload?.shortId ?? '');
+    _downloadSpiderXController =
+        TextEditingController(text: initialDownload?.spiderX ?? '');
+    _downloadHostController =
+        TextEditingController(text: initialDownload?.host ?? '');
+    _downloadPathController =
+        TextEditingController(text: initialDownload?.path ?? '');
+    _downloadModeController =
+        TextEditingController(text: initialDownload?.mode ?? '');
+    _downloadAlpnController =
+        TextEditingController(text: initialDownload?.alpn.join(',') ?? '');
   }
 
   @override
@@ -1593,550 +2253,547 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
     final bool showDownloadTlsFields =
         showDownloadSection && _selectedDownloadSecurity.toLowerCase() == 'tls';
 
-    return AnimatedPadding(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOut,
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: FractionallySizedBox(
-        heightFactor: 0.92,
-        child: Material(
-          color: theme.colorScheme.surface,
-          child: Column(
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+    final Widget content = Material(
+      color: theme.colorScheme.surface,
+      borderRadius:
+          widget.desktopStyle ? BorderRadius.circular(24) : BorderRadius.zero,
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  widget.title,
+                  style: theme.textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '直接编辑节点字段。基础分享链接会继续保留在上传侧参数里，split 模式的 downloadSettings 也会一并保存。',
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: Form(
+                key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(widget.title, style: theme.textTheme.titleLarge),
-                    const SizedBox(height: 8),
-                    Text(
-                      '直接编辑节点字段。基础分享链接会继续保留在上传侧参数里，split 模式的 downloadSettings 也会一并保存。',
-                      style: theme.textTheme.bodyMedium,
+                    _NodeEditorSection(
+                      title: '基础信息',
+                      child: Column(
+                        children: <Widget>[
+                          TextFormField(
+                            controller: _nameController,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              labelText: '配置名称',
+                              hintText: '例如：东京节点',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _addressController,
+                            autofocus: widget.initialNode == null,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              labelText: '服务器地址',
+                              hintText: 'example.com 或 1.2.3.4',
+                            ),
+                            validator: (String? value) {
+                              if ((value ?? '').trim().isEmpty) {
+                                return '请输入服务器地址';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _portController,
+                            keyboardType: TextInputType.number,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              labelText: '服务器端口',
+                            ),
+                            validator: (String? value) {
+                              final int? port =
+                                  int.tryParse((value ?? '').trim());
+                              if (port == null || port <= 0 || port > 65535) {
+                                return '请输入有效端口';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _idController,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              labelText: 'UUID',
+                            ),
+                            validator: (String? value) {
+                              if ((value ?? '').trim().isEmpty) {
+                                return '请输入 UUID';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        _NodeEditorSection(
-                          title: '基础信息',
-                          child: Column(
-                            children: <Widget>[
+                    const SizedBox(height: 16),
+                    _NodeEditorSection(
+                      title: '传输与安全',
+                      child: Column(
+                        children: <Widget>[
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedNetwork,
+                            decoration: const InputDecoration(
+                              labelText: '传输协议',
+                            ),
+                            items: _networkOptions
+                                .map(
+                                  (String value) => DropdownMenuItem<String>(
+                                    value: value,
+                                    child: Text(value.toUpperCase()),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (String? value) {
+                              if (value == null) {
+                                return;
+                              }
+                              setState(() {
+                                _selectedNetwork = value;
+                                if (_selectedNetwork.toLowerCase() != 'xhttp') {
+                                  _enableDownloadSettings = false;
+                                }
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedSecurity,
+                            decoration: const InputDecoration(
+                              labelText: '安全类型',
+                            ),
+                            items: _securityOptions
+                                .map(
+                                  (String value) => DropdownMenuItem<String>(
+                                    value: value,
+                                    child: Text(value.toUpperCase()),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (String? value) {
+                              if (value == null) {
+                                return;
+                              }
+                              setState(() {
+                                _selectedSecurity = value;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _encryptionController,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              labelText: 'Encryption',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _flowController,
+                            textInputAction: TextInputAction.next,
+                            decoration: const InputDecoration(
+                              labelText: 'Flow',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (showSecurityFields) ...<Widget>[
+                      const SizedBox(height: 16),
+                      _NodeEditorSection(
+                        title: showRealityFields ? 'REALITY' : 'TLS',
+                        child: Column(
+                          children: <Widget>[
+                            TextFormField(
+                              controller: _serverNameController,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'SNI / serverName',
+                              ),
+                              validator: (String? value) {
+                                if (showSecurityFields &&
+                                    (value ?? '').trim().isEmpty) {
+                                  return '当前安全类型需要 serverName';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _fingerprintController,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Fingerprint',
+                              ),
+                              validator: (String? value) {
+                                if (showSecurityFields &&
+                                    (value ?? '').trim().isEmpty) {
+                                  return '当前安全类型需要 fingerprint';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            if (showTlsFields)
                               TextFormField(
-                                controller: _nameController,
+                                controller: _alpnController,
                                 textInputAction: TextInputAction.next,
                                 decoration: const InputDecoration(
-                                  labelText: '配置名称',
-                                  hintText: '例如：东京节点',
+                                  labelText: 'ALPN',
+                                  hintText: '例如：h2 或 h2,http/1.1',
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                            if (showRealityFields) ...<Widget>[
                               TextFormField(
-                                controller: _addressController,
-                                autofocus: widget.initialNode == null,
+                                controller: _publicKeyController,
                                 textInputAction: TextInputAction.next,
                                 decoration: const InputDecoration(
-                                  labelText: '服务器地址',
-                                  hintText: 'example.com 或 1.2.3.4',
+                                  labelText: 'Public Key',
                                 ),
                                 validator: (String? value) {
-                                  if ((value ?? '').trim().isEmpty) {
-                                    return '请输入服务器地址';
+                                  if (showRealityFields &&
+                                      (value ?? '').trim().isEmpty) {
+                                    return 'REALITY 需要 public key';
                                   }
                                   return null;
                                 },
                               ),
                               const SizedBox(height: 12),
                               TextFormField(
-                                controller: _portController,
+                                controller: _shortIdController,
+                                textInputAction: TextInputAction.next,
+                                decoration: const InputDecoration(
+                                  labelText: 'Short ID',
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _spiderXController,
+                                textInputAction: TextInputAction.next,
+                                decoration: const InputDecoration(
+                                  labelText: 'SpiderX',
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (showXhttpFields) ...<Widget>[
+                      const SizedBox(height: 16),
+                      _NodeEditorSection(
+                        title: 'XHTTP',
+                        child: Column(
+                          children: <Widget>[
+                            TextFormField(
+                              controller: _hostController,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Host',
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _pathController,
+                              textInputAction: TextInputAction.next,
+                              decoration: const InputDecoration(
+                                labelText: 'Path',
+                              ),
+                              validator: (String? value) {
+                                if (showXhttpFields &&
+                                    (value ?? '').trim().isEmpty) {
+                                  return 'XHTTP 需要 path';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _modeController,
+                              textInputAction: TextInputAction.done,
+                              decoration: const InputDecoration(
+                                labelText: 'Mode',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (showXhttpFields) ...<Widget>[
+                      const SizedBox(height: 16),
+                      _NodeEditorSection(
+                        title: '分离下行',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            SwitchListTile.adaptive(
+                              contentPadding: EdgeInsets.zero,
+                              value: _enableDownloadSettings,
+                              title: const Text('启用 downloadSettings'),
+                              subtitle: const Text(
+                                '用于 IPv6 上行 + IPv4 下行、双 VPS、CDN + VPS 这类 split 模式。',
+                              ),
+                              onChanged: (bool value) {
+                                setState(() {
+                                  _enableDownloadSettings = value;
+                                  if (value) {
+                                    _syncDownloadDefaultsFromUpload();
+                                  }
+                                });
+                              },
+                            ),
+                            if (showDownloadSection) ...<Widget>[
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _downloadAddressController,
+                                textInputAction: TextInputAction.next,
+                                decoration: const InputDecoration(
+                                  labelText: '下行地址',
+                                  hintText: 'IPv4、IPv6 或域名',
+                                ),
+                                validator: (String? value) {
+                                  if (showDownloadSection &&
+                                      (value ?? '').trim().isEmpty) {
+                                    return '请输入下行地址';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _downloadPortController,
                                 keyboardType: TextInputType.number,
                                 textInputAction: TextInputAction.next,
                                 decoration: const InputDecoration(
-                                  labelText: '服务器端口',
+                                  labelText: '下行端口',
                                 ),
                                 validator: (String? value) {
-                                  final int? port = int.tryParse(
-                                    (value ?? '').trim(),
-                                  );
+                                  if (!showDownloadSection) {
+                                    return null;
+                                  }
+                                  final int? port =
+                                      int.tryParse((value ?? '').trim());
                                   if (port == null ||
                                       port <= 0 ||
                                       port > 65535) {
-                                    return '请输入有效端口';
+                                    return '请输入有效下行端口';
                                   }
                                   return null;
                                 },
                               ),
                               const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                initialValue: _selectedDownloadNetwork,
+                                decoration: const InputDecoration(
+                                  labelText: '下行传输协议',
+                                ),
+                                items: _downloadNetworkOptions
+                                    .map(
+                                      (String value) =>
+                                          DropdownMenuItem<String>(
+                                        value: value,
+                                        child: Text(value.toUpperCase()),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (String? value) {
+                                  if (value == null) {
+                                    return;
+                                  }
+                                  setState(() {
+                                    _selectedDownloadNetwork = value;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                initialValue: _selectedDownloadSecurity,
+                                decoration: const InputDecoration(
+                                  labelText: '下行安全类型',
+                                ),
+                                items: _downloadSecurityOptions
+                                    .map(
+                                      (String value) =>
+                                          DropdownMenuItem<String>(
+                                        value: value,
+                                        child: Text(value.toUpperCase()),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (String? value) {
+                                  if (value == null) {
+                                    return;
+                                  }
+                                  setState(() {
+                                    _selectedDownloadSecurity = value;
+                                  });
+                                },
+                              ),
+                              if (showDownloadSecurityFields) ...<Widget>[
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _downloadServerNameController,
+                                  textInputAction: TextInputAction.next,
+                                  decoration: const InputDecoration(
+                                    labelText: '下行 SNI / serverName',
+                                  ),
+                                  validator: (String? value) {
+                                    if (showDownloadSecurityFields &&
+                                        (value ?? '').trim().isEmpty) {
+                                      return '下行安全类型需要 serverName';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _downloadFingerprintController,
+                                  textInputAction: TextInputAction.next,
+                                  decoration: const InputDecoration(
+                                    labelText: '下行 Fingerprint',
+                                  ),
+                                  validator: (String? value) {
+                                    if (showDownloadSecurityFields &&
+                                        (value ?? '').trim().isEmpty) {
+                                      return '下行安全类型需要 fingerprint';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ],
+                              if (showDownloadTlsFields) ...<Widget>[
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _downloadAlpnController,
+                                  textInputAction: TextInputAction.next,
+                                  decoration: const InputDecoration(
+                                    labelText: '下行 ALPN',
+                                    hintText: '例如：h2',
+                                  ),
+                                ),
+                              ],
+                              if (showDownloadRealityFields) ...<Widget>[
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _downloadPublicKeyController,
+                                  textInputAction: TextInputAction.next,
+                                  decoration: const InputDecoration(
+                                    labelText: '下行 Public Key',
+                                  ),
+                                  validator: (String? value) {
+                                    if (showDownloadRealityFields &&
+                                        (value ?? '').trim().isEmpty) {
+                                      return '下行 REALITY 需要 public key';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _downloadShortIdController,
+                                  textInputAction: TextInputAction.next,
+                                  decoration: const InputDecoration(
+                                    labelText: '下行 Short ID',
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _downloadSpiderXController,
+                                  textInputAction: TextInputAction.next,
+                                  decoration: const InputDecoration(
+                                    labelText: '下行 SpiderX',
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 12),
                               TextFormField(
-                                controller: _idController,
+                                controller: _downloadHostController,
                                 textInputAction: TextInputAction.next,
                                 decoration: const InputDecoration(
-                                  labelText: 'UUID',
+                                  labelText: '下行 Host',
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _downloadPathController,
+                                textInputAction: TextInputAction.next,
+                                decoration: const InputDecoration(
+                                  labelText: '下行 Path',
                                 ),
                                 validator: (String? value) {
-                                  if ((value ?? '').trim().isEmpty) {
-                                    return '请输入 UUID';
+                                  if (showDownloadSection &&
+                                      (value ?? '').trim().isEmpty) {
+                                    return '下行 XHTTP 需要 path';
                                   }
                                   return null;
                                 },
                               ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _NodeEditorSection(
-                          title: '传输与安全',
-                          child: Column(
-                            children: <Widget>[
-                              DropdownButtonFormField<String>(
-                                initialValue: _selectedNetwork,
-                                decoration: const InputDecoration(
-                                  labelText: '传输协议',
-                                ),
-                                items: _networkOptions
-                                    .map(
-                                      (String value) =>
-                                          DropdownMenuItem<String>(
-                                        value: value,
-                                        child: Text(value.toUpperCase()),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (String? value) {
-                                  if (value == null) {
-                                    return;
-                                  }
-                                  setState(() {
-                                    _selectedNetwork = value;
-                                    if (_selectedNetwork.toLowerCase() !=
-                                        'xhttp') {
-                                      _enableDownloadSettings = false;
-                                    }
-                                  });
-                                },
-                              ),
-                              const SizedBox(height: 12),
-                              DropdownButtonFormField<String>(
-                                initialValue: _selectedSecurity,
-                                decoration: const InputDecoration(
-                                  labelText: '安全类型',
-                                ),
-                                items: _securityOptions
-                                    .map(
-                                      (String value) =>
-                                          DropdownMenuItem<String>(
-                                        value: value,
-                                        child: Text(value.toUpperCase()),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (String? value) {
-                                  if (value == null) {
-                                    return;
-                                  }
-                                  setState(() {
-                                    _selectedSecurity = value;
-                                  });
-                                },
-                              ),
                               const SizedBox(height: 12),
                               TextFormField(
-                                controller: _encryptionController,
-                                textInputAction: TextInputAction.next,
+                                controller: _downloadModeController,
+                                textInputAction: TextInputAction.done,
                                 decoration: const InputDecoration(
-                                  labelText: 'Encryption',
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              TextFormField(
-                                controller: _flowController,
-                                textInputAction: TextInputAction.next,
-                                decoration: const InputDecoration(
-                                  labelText: 'Flow',
+                                  labelText: '下行 Mode',
                                 ),
                               ),
                             ],
-                          ),
+                          ],
                         ),
-                        if (showSecurityFields) ...<Widget>[
-                          const SizedBox(height: 16),
-                          _NodeEditorSection(
-                            title: showRealityFields ? 'REALITY' : 'TLS',
-                            child: Column(
-                              children: <Widget>[
-                                TextFormField(
-                                  controller: _serverNameController,
-                                  textInputAction: TextInputAction.next,
-                                  decoration: const InputDecoration(
-                                    labelText: 'SNI / serverName',
-                                  ),
-                                  validator: (String? value) {
-                                    if (showSecurityFields &&
-                                        (value ?? '').trim().isEmpty) {
-                                      return '当前安全类型需要 serverName';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 12),
-                                TextFormField(
-                                  controller: _fingerprintController,
-                                  textInputAction: TextInputAction.next,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Fingerprint',
-                                  ),
-                                  validator: (String? value) {
-                                    if (showSecurityFields &&
-                                        (value ?? '').trim().isEmpty) {
-                                      return '当前安全类型需要 fingerprint';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 12),
-                                if (showTlsFields)
-                                  TextFormField(
-                                    controller: _alpnController,
-                                    textInputAction: TextInputAction.next,
-                                    decoration: const InputDecoration(
-                                      labelText: 'ALPN',
-                                      hintText: '例如：h2 或 h2,http/1.1',
-                                    ),
-                                  ),
-                                if (showRealityFields) ...<Widget>[
-                                  TextFormField(
-                                    controller: _publicKeyController,
-                                    textInputAction: TextInputAction.next,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Public Key',
-                                    ),
-                                    validator: (String? value) {
-                                      if (showRealityFields &&
-                                          (value ?? '').trim().isEmpty) {
-                                        return 'REALITY 需要 public key';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 12),
-                                  TextFormField(
-                                    controller: _shortIdController,
-                                    textInputAction: TextInputAction.next,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Short ID',
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  TextFormField(
-                                    controller: _spiderXController,
-                                    textInputAction: TextInputAction.next,
-                                    decoration: const InputDecoration(
-                                      labelText: 'SpiderX',
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ],
-                        if (showXhttpFields) ...<Widget>[
-                          const SizedBox(height: 16),
-                          _NodeEditorSection(
-                            title: 'XHTTP',
-                            child: Column(
-                              children: <Widget>[
-                                TextFormField(
-                                  controller: _hostController,
-                                  textInputAction: TextInputAction.next,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Host',
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                TextFormField(
-                                  controller: _pathController,
-                                  textInputAction: TextInputAction.next,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Path',
-                                  ),
-                                  validator: (String? value) {
-                                    if (showXhttpFields &&
-                                        (value ?? '').trim().isEmpty) {
-                                      return 'XHTTP 需要 path';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 12),
-                                TextFormField(
-                                  controller: _modeController,
-                                  textInputAction: TextInputAction.done,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Mode',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                        if (showXhttpFields) ...<Widget>[
-                          const SizedBox(height: 16),
-                          _NodeEditorSection(
-                            title: '分离下行',
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                SwitchListTile.adaptive(
-                                  contentPadding: EdgeInsets.zero,
-                                  value: _enableDownloadSettings,
-                                  title: const Text('启用 downloadSettings'),
-                                  subtitle: const Text(
-                                    '用于 IPv6 上行 + IPv4 下行、双 VPS、CDN + VPS 这类 split 模式。',
-                                  ),
-                                  onChanged: (bool value) {
-                                    setState(() {
-                                      _enableDownloadSettings = value;
-                                      if (value) {
-                                        _syncDownloadDefaultsFromUpload();
-                                      }
-                                    });
-                                  },
-                                ),
-                                if (showDownloadSection) ...<Widget>[
-                                  const SizedBox(height: 12),
-                                  TextFormField(
-                                    controller: _downloadAddressController,
-                                    textInputAction: TextInputAction.next,
-                                    decoration: const InputDecoration(
-                                      labelText: '下行地址',
-                                      hintText: 'IPv4、IPv6 或域名',
-                                    ),
-                                    validator: (String? value) {
-                                      if (showDownloadSection &&
-                                          (value ?? '').trim().isEmpty) {
-                                        return '请输入下行地址';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 12),
-                                  TextFormField(
-                                    controller: _downloadPortController,
-                                    keyboardType: TextInputType.number,
-                                    textInputAction: TextInputAction.next,
-                                    decoration: const InputDecoration(
-                                      labelText: '下行端口',
-                                    ),
-                                    validator: (String? value) {
-                                      if (!showDownloadSection) {
-                                        return null;
-                                      }
-                                      final int? port = int.tryParse(
-                                        (value ?? '').trim(),
-                                      );
-                                      if (port == null ||
-                                          port <= 0 ||
-                                          port > 65535) {
-                                        return '请输入有效下行端口';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 12),
-                                  DropdownButtonFormField<String>(
-                                    initialValue: _selectedDownloadNetwork,
-                                    decoration: const InputDecoration(
-                                      labelText: '下行传输协议',
-                                    ),
-                                    items: _downloadNetworkOptions
-                                        .map(
-                                          (String value) =>
-                                              DropdownMenuItem<String>(
-                                            value: value,
-                                            child: Text(
-                                              value.toUpperCase(),
-                                            ),
-                                          ),
-                                        )
-                                        .toList(),
-                                    onChanged: (String? value) {
-                                      if (value == null) {
-                                        return;
-                                      }
-                                      setState(() {
-                                        _selectedDownloadNetwork = value;
-                                      });
-                                    },
-                                  ),
-                                  const SizedBox(height: 12),
-                                  DropdownButtonFormField<String>(
-                                    initialValue: _selectedDownloadSecurity,
-                                    decoration: const InputDecoration(
-                                      labelText: '下行安全类型',
-                                    ),
-                                    items: _downloadSecurityOptions
-                                        .map(
-                                          (String value) =>
-                                              DropdownMenuItem<String>(
-                                            value: value,
-                                            child: Text(
-                                              value.toUpperCase(),
-                                            ),
-                                          ),
-                                        )
-                                        .toList(),
-                                    onChanged: (String? value) {
-                                      if (value == null) {
-                                        return;
-                                      }
-                                      setState(() {
-                                        _selectedDownloadSecurity = value;
-                                      });
-                                    },
-                                  ),
-                                  if (showDownloadSecurityFields) ...<Widget>[
-                                    const SizedBox(height: 12),
-                                    TextFormField(
-                                      controller: _downloadServerNameController,
-                                      textInputAction: TextInputAction.next,
-                                      decoration: const InputDecoration(
-                                        labelText: '下行 SNI / serverName',
-                                      ),
-                                      validator: (String? value) {
-                                        if (showDownloadSecurityFields &&
-                                            (value ?? '').trim().isEmpty) {
-                                          return '下行安全类型需要 serverName';
-                                        }
-                                        return null;
-                                      },
-                                    ),
-                                    const SizedBox(height: 12),
-                                    TextFormField(
-                                      controller:
-                                          _downloadFingerprintController,
-                                      textInputAction: TextInputAction.next,
-                                      decoration: const InputDecoration(
-                                        labelText: '下行 Fingerprint',
-                                      ),
-                                      validator: (String? value) {
-                                        if (showDownloadSecurityFields &&
-                                            (value ?? '').trim().isEmpty) {
-                                          return '下行安全类型需要 fingerprint';
-                                        }
-                                        return null;
-                                      },
-                                    ),
-                                  ],
-                                  if (showDownloadTlsFields) ...<Widget>[
-                                    const SizedBox(height: 12),
-                                    TextFormField(
-                                      controller: _downloadAlpnController,
-                                      textInputAction: TextInputAction.next,
-                                      decoration: const InputDecoration(
-                                        labelText: '下行 ALPN',
-                                        hintText: '例如：h2',
-                                      ),
-                                    ),
-                                  ],
-                                  if (showDownloadRealityFields) ...<Widget>[
-                                    const SizedBox(height: 12),
-                                    TextFormField(
-                                      controller: _downloadPublicKeyController,
-                                      textInputAction: TextInputAction.next,
-                                      decoration: const InputDecoration(
-                                        labelText: '下行 Public Key',
-                                      ),
-                                      validator: (String? value) {
-                                        if (showDownloadRealityFields &&
-                                            (value ?? '').trim().isEmpty) {
-                                          return '下行 REALITY 需要 public key';
-                                        }
-                                        return null;
-                                      },
-                                    ),
-                                    const SizedBox(height: 12),
-                                    TextFormField(
-                                      controller: _downloadShortIdController,
-                                      textInputAction: TextInputAction.next,
-                                      decoration: const InputDecoration(
-                                        labelText: '下行 Short ID',
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    TextFormField(
-                                      controller: _downloadSpiderXController,
-                                      textInputAction: TextInputAction.next,
-                                      decoration: const InputDecoration(
-                                        labelText: '下行 SpiderX',
-                                      ),
-                                    ),
-                                  ],
-                                  const SizedBox(height: 12),
-                                  TextFormField(
-                                    controller: _downloadHostController,
-                                    textInputAction: TextInputAction.next,
-                                    decoration: const InputDecoration(
-                                      labelText: '下行 Host',
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  TextFormField(
-                                    controller: _downloadPathController,
-                                    textInputAction: TextInputAction.next,
-                                    decoration: const InputDecoration(
-                                      labelText: '下行 Path',
-                                    ),
-                                    validator: (String? value) {
-                                      if (showDownloadSection &&
-                                          (value ?? '').trim().isEmpty) {
-                                        return '下行 XHTTP 需要 path';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 12),
-                                  TextFormField(
-                                    controller: _downloadModeController,
-                                    textInputAction: TextInputAction.done,
-                                    decoration: const InputDecoration(
-                                      labelText: '下行 Mode',
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _submit,
-                    icon: const Icon(Icons.download_done_outlined),
-                    label: Text(widget.actionLabel),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _submit,
+                icon: const Icon(Icons.download_done_outlined),
+                label: Text(widget.actionLabel),
+              ),
+            ),
+          ),
+        ],
       ),
+    );
+
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: widget.desktopStyle ? 0 : bottomInset),
+      child: widget.desktopStyle
+          ? content
+          : FractionallySizedBox(
+              heightFactor: 0.92,
+              child: content,
+            ),
     );
   }
 
@@ -2269,7 +2926,10 @@ class _NodeEditorSheetState extends State<_NodeEditorSheet> {
 }
 
 class _NodeEditorSection extends StatelessWidget {
-  const _NodeEditorSection({required this.title, required this.child});
+  const _NodeEditorSection({
+    required this.title,
+    required this.child,
+  });
 
   final String title;
   final Widget child;
@@ -2278,18 +2938,27 @@ class _NodeEditorSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme colors = theme.colorScheme;
+    final bool isMacOS = Platform.isMacOS;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(isMacOS ? 18 : 24),
+        border: isMacOS
+            ? Border.all(
+                color: colors.outlineVariant.withValues(alpha: 0.4),
+              )
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(title, style: theme.textTheme.titleMedium),
+          Text(
+            title,
+            style: theme.textTheme.titleMedium,
+          ),
           const SizedBox(height: 12),
           child,
         ],
@@ -2298,8 +2967,65 @@ class _NodeEditorSection extends StatelessWidget {
   }
 }
 
+class _MacSidebarItem extends StatelessWidget {
+  const _MacSidebarItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme colors = theme.colorScheme;
+
+    return Material(
+      color: selected
+          ? colors.primary.withValues(alpha: 0.12)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: <Widget>[
+              Icon(
+                icon,
+                size: 20,
+                color: selected ? colors.primary : colors.onSurfaceVariant,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color:
+                        selected ? colors.onSurface : colors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.label, required this.color});
+  const _StatusChip({
+    required this.label,
+    required this.color,
+  });
 
   final String label;
   final Color color;
@@ -2315,7 +3041,11 @@ class _StatusChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(Icons.circle, size: 10, color: color),
+          Icon(
+            Icons.circle,
+            size: 10,
+            color: color,
+          ),
           const SizedBox(width: 8),
           Text(label),
         ],
@@ -2325,7 +3055,10 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.icon, required this.label});
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+  });
 
   final IconData icon;
   final String label;
@@ -2343,7 +3076,11 @@ class _InfoChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(icon, size: 18, color: colors.onSurfaceVariant),
+          Icon(
+            icon,
+            size: 18,
+            color: colors.onSurfaceVariant,
+          ),
           const SizedBox(width: 8),
           Text(label),
         ],

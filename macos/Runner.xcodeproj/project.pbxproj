@@ -22,23 +22,13 @@
 
 /* Begin PBXBuildFile section */
 		331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C80D7294CF71000263BE5 /* RunnerTests.swift */; };
+		335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */; };
 		33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC10F02044A3C60003C045 /* AppDelegate.swift */; };
 		33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F22044A3C60003C045 /* Assets.xcassets */; };
+		33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 33CC10F42044A3C60003C045 /* MainMenu.xib */; };
 		33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33CC11122044BFA00003C045 /* MainFlutterWindow.swift */; };
-		42FE685E593E82194AFE0E0D /* PacketTunnel.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = E65D331F9B49A9B4F9F6F231 /* PacketTunnel.appex */; };
-		9097B47897D6B30ADD27A811 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C8DF29BFAE6DD773E9A19E /* PacketTunnelProvider.swift */; };
-		9A7E0001294D000100000018 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 9A7E0001294D000100000008 /* assets */; };
-		9A7E0001294D000100000011 /* NativeAppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E0001294D000100000001 /* NativeAppState.swift */; };
-		9A7E0001294D000100000012 /* NativeRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E0001294D000100000002 /* NativeRootView.swift */; };
-		9A7E0001294D000100000013 /* NativeCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E0001294D000100000004 /* NativeCore.swift */; };
-		9A7E0001294D000100000014 /* NativeStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E0001294D000100000005 /* NativeStorage.swift */; };
-		9A7E0001294D000100000015 /* NativeMacosSystemProxyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E0001294D000100000006 /* NativeMacosSystemProxyManager.swift */; };
-		9A7E0001294D000100000016 /* NativeRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E0001294D000100000007 /* NativeRuntime.swift */; };
-		9A7E0001294D000100000019 /* NativeRuntimeAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A7E0001294D000100000009 /* NativeRuntimeAssets.swift */; };
-		CB1491F4F1A4BE670E838156 /* NativePacketTunnelService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9FAD4533791CAE3FFE2516A /* NativePacketTunnelService.swift */; };
-		DEFE944EF5C9DC79D04AB28C /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 29C5B3B0278391849DA16EB2 /* NetworkExtension.framework */; };
-		E2E2D3C139ACDABBDA4639CC /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 29C5B3B0278391849DA16EB2 /* NetworkExtension.framework */; };
-		FF3EA12D473147BA44F4377B /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 992F2F7D4E84FE6BA1B0DB05 /* Cocoa.framework */; };
+		9C7E6D1DCC9AE6D9189D2083 /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CA22AC2264CFB212C1C22852 /* Pods_RunnerTests.framework */; };
+		E5AF4CFCF1FBC337F926FEF2 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2219F5176BBB2B2DF36F449C /* Pods_Runner.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -49,12 +39,12 @@
 			remoteGlobalIDString = 33CC10EC2044A3C60003C045;
 			remoteInfo = Runner;
 		};
-		E6BEDC6F702DD6BD965A9463 /* PBXContainerItemProxy */ = {
+		33CC111F2044C79F0003C045 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 33CC10E52044A3C60003C045 /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = D8C1C6039236F521F1309CDB;
-			remoteInfo = PacketTunnel;
+			remoteGlobalIDString = 33CC111A2044C6BA0003C045;
+			remoteInfo = FLX;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -69,22 +59,10 @@
 			name = "Bundle Framework";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		9B3963CFEBAE8C45C9C0B050 /* Embed App Extensions */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 13;
-			files = (
-				42FE685E593E82194AFE0E0D /* PacketTunnel.appex in Embed App Extensions */,
-			);
-			name = "Embed App Extensions";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		23C8DF29BFAE6DD773E9A19E /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
-		29C5B3B0278391849DA16EB2 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
+		2219F5176BBB2B2DF36F449C /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		331C80D5294CF71000263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		331C80D7294CF71000263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		333000ED22D3DE5D00554162 /* Warnings.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Warnings.xcconfig; sourceTree = "<group>"; };
@@ -101,21 +79,15 @@
 		33E51913231747F40026EE4D /* DebugProfile.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = DebugProfile.entitlements; sourceTree = "<group>"; };
 		33E51914231749380026EE4D /* Release.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = Release.entitlements; sourceTree = "<group>"; };
 		33E5194F232828860026EE4D /* AppInfo.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = AppInfo.xcconfig; sourceTree = "<group>"; };
-		78429BA87C5158D8E66501EF /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		3BBDC03E4D3E0B58C997C191 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
+		49DC479AE6DBE3A6E1680884 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
+		6BB620B30EE1A3D569187F78 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
-		992F2F7D4E84FE6BA1B0DB05 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
-		9A7E0001294D000100000001 /* NativeAppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAppState.swift; sourceTree = "<group>"; };
-		9A7E0001294D000100000002 /* NativeRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRootView.swift; sourceTree = "<group>"; };
-		9A7E0001294D000100000004 /* NativeCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCore.swift; sourceTree = "<group>"; };
-		9A7E0001294D000100000005 /* NativeStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeStorage.swift; sourceTree = "<group>"; };
-		9A7E0001294D000100000006 /* NativeMacosSystemProxyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeMacosSystemProxyManager.swift; sourceTree = "<group>"; };
-		9A7E0001294D000100000007 /* NativeRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRuntime.swift; sourceTree = "<group>"; };
-		9A7E0001294D000100000008 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../assets; sourceTree = SOURCE_ROOT; };
-		9A7E0001294D000100000009 /* NativeRuntimeAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRuntimeAssets.swift; sourceTree = "<group>"; };
-		A6B75CBDFEF066C6D318FA82 /* PacketTunnel.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = PacketTunnel.entitlements; sourceTree = "<group>"; };
-		B9FAD4533791CAE3FFE2516A /* NativePacketTunnelService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NativePacketTunnelService.swift; sourceTree = "<group>"; };
-		E65D331F9B49A9B4F9F6F231 /* PacketTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PacketTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		982CFC85B18F6EF1E20C2C5B /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
+		9E4DBAEDEB89A6CFB767059F /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
+		CA22AC2264CFB212C1C22852 /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		F76485DED1CCF3C453DEA035 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -123,6 +95,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9C7E6D1DCC9AE6D9189D2083 /* Pods_RunnerTests.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -130,33 +103,13 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DEFE944EF5C9DC79D04AB28C /* NetworkExtension.framework in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		FFADDB98DE49332DD7AF3161 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				FF3EA12D473147BA44F4377B /* Cocoa.framework in Frameworks */,
-				E2E2D3C139ACDABBDA4639CC /* NetworkExtension.framework in Frameworks */,
+				E5AF4CFCF1FBC337F926FEF2 /* Pods_Runner.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		0908EE0BCBDEC1C3BFF719EA /* PacketTunnel */ = {
-			isa = PBXGroup;
-			children = (
-				23C8DF29BFAE6DD773E9A19E /* PacketTunnelProvider.swift */,
-				78429BA87C5158D8E66501EF /* Info.plist */,
-				A6B75CBDFEF066C6D318FA82 /* PacketTunnel.entitlements */,
-			);
-			name = PacketTunnel;
-			path = PacketTunnel;
-			sourceTree = "<group>";
-		};
 		331C80D6294CF71000263BE5 /* RunnerTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -184,7 +137,7 @@
 				331C80D6294CF71000263BE5 /* RunnerTests */,
 				33CC10EE2044A3C60003C045 /* Products */,
 				D73912EC22F37F3D000D13A0 /* Frameworks */,
-				0908EE0BCBDEC1C3BFF719EA /* PacketTunnel */,
+				35888D1A7A964D0E8DFFDCBD /* Pods */,
 			);
 			sourceTree = "<group>";
 		};
@@ -193,19 +146,17 @@
 			children = (
 				33CC10ED2044A3C60003C045 /* xray_gui.app */,
 				331C80D5294CF71000263BE5 /* RunnerTests.xctest */,
-				E65D331F9B49A9B4F9F6F231 /* PacketTunnel.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-			33CC11242044D66E0003C045 /* Resources */ = {
-				isa = PBXGroup;
-				children = (
-					9A7E0001294D000100000008 /* assets */,
-					33CC10F22044A3C60003C045 /* Assets.xcassets */,
-					33CC10F42044A3C60003C045 /* MainMenu.xib */,
-					33CC10F72044A3C60003C045 /* Info.plist */,
-				);
+		33CC11242044D66E0003C045 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				33CC10F22044A3C60003C045 /* Assets.xcassets */,
+				33CC10F42044A3C60003C045 /* MainMenu.xib */,
+				33CC10F72044A3C60003C045 /* Info.plist */,
+			);
 			name = Resources;
 			path = ..;
 			sourceTree = "<group>";
@@ -225,36 +176,34 @@
 			isa = PBXGroup;
 			children = (
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
-				9A7E0001294D000100000001 /* NativeAppState.swift */,
-				9A7E0001294D000100000002 /* NativeRootView.swift */,
-				9A7E0001294D000100000004 /* NativeCore.swift */,
-				9A7E0001294D000100000005 /* NativeStorage.swift */,
-				9A7E0001294D000100000006 /* NativeMacosSystemProxyManager.swift */,
-				9A7E0001294D000100000007 /* NativeRuntime.swift */,
-				9A7E0001294D000100000009 /* NativeRuntimeAssets.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
 				33E51914231749380026EE4D /* Release.entitlements */,
 				33CC11242044D66E0003C045 /* Resources */,
 				33BA886A226E78AF003329D5 /* Configs */,
-				B9FAD4533791CAE3FFE2516A /* NativePacketTunnelService.swift */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
 		};
-		C6C60BEA8F42C8CA8A11AB89 /* OS X */ = {
+		35888D1A7A964D0E8DFFDCBD /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				992F2F7D4E84FE6BA1B0DB05 /* Cocoa.framework */,
+				F76485DED1CCF3C453DEA035 /* Pods-Runner.debug.xcconfig */,
+				982CFC85B18F6EF1E20C2C5B /* Pods-Runner.release.xcconfig */,
+				9E4DBAEDEB89A6CFB767059F /* Pods-Runner.profile.xcconfig */,
+				6BB620B30EE1A3D569187F78 /* Pods-RunnerTests.debug.xcconfig */,
+				49DC479AE6DBE3A6E1680884 /* Pods-RunnerTests.release.xcconfig */,
+				3BBDC03E4D3E0B58C997C191 /* Pods-RunnerTests.profile.xcconfig */,
 			);
-			name = "OS X";
+			name = Pods;
+			path = Pods;
 			sourceTree = "<group>";
 		};
 		D73912EC22F37F3D000D13A0 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				C6C60BEA8F42C8CA8A11AB89 /* OS X */,
-				29C5B3B0278391849DA16EB2 /* NetworkExtension.framework */,
+				2219F5176BBB2B2DF36F449C /* Pods_Runner.framework */,
+				CA22AC2264CFB212C1C22852 /* Pods_RunnerTests.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -266,6 +215,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 331C80DE294CF71000263BE5 /* Build configuration list for PBXNativeTarget "RunnerTests" */;
 			buildPhases = (
+				5587E7C50D42615E722696FB /* [CP] Check Pods Manifest.lock */,
 				331C80D1294CF70F00263BE5 /* Sources */,
 				331C80D2294CF70F00263BE5 /* Frameworks */,
 				331C80D3294CF70F00263BE5 /* Resources */,
@@ -284,38 +234,23 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 33CC10FB2044A3C60003C045 /* Build configuration list for PBXNativeTarget "Runner" */;
 			buildPhases = (
+				208ACB29C2094743FCA4372C /* [CP] Check Pods Manifest.lock */,
 				33CC10E92044A3C60003C045 /* Sources */,
 				33CC10EA2044A3C60003C045 /* Frameworks */,
 				33CC10EB2044A3C60003C045 /* Resources */,
 				33CC110E2044A8840003C045 /* Bundle Framework */,
-				9B3963CFEBAE8C45C9C0B050 /* Embed App Extensions */,
+				3399D490228B24CF009A79C7 /* ShellScript */,
+				AE64E0050EB9F37BE3B99076 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				4970A86F500ABAA3C782978C /* PBXTargetDependency */,
+				33CC11202044C79F0003C045 /* PBXTargetDependency */,
 			);
 			name = Runner;
 			productName = Runner;
 			productReference = 33CC10ED2044A3C60003C045 /* xray_gui.app */;
 			productType = "com.apple.product-type.application";
-		};
-		D8C1C6039236F521F1309CDB /* PacketTunnel */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = B199D18F4CC40480767F0B34 /* Build configuration list for PBXNativeTarget "PacketTunnel" */;
-			buildPhases = (
-				6E9F7B8D9BBF0C04815B9574 /* Sources */,
-				FFADDB98DE49332DD7AF3161 /* Frameworks */,
-				6B34FECF67FAB9BC310F67E5 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = PacketTunnel;
-			productName = PacketTunnel;
-			productReference = E65D331F9B49A9B4F9F6F231 /* PacketTunnel.appex */;
-			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -338,17 +273,13 @@
 						ProvisioningStyle = Automatic;
 						SystemCapabilities = {
 							com.apple.Sandbox = {
-								enabled = 0;
+								enabled = 1;
 							};
 						};
 					};
 					33CC111A2044C6BA0003C045 = {
 						CreatedOnToolsVersion = 9.2;
 						ProvisioningStyle = Manual;
-					};
-					D8C1C6039236F521F1309CDB = {
-						CreatedOnToolsVersion = 26.3;
-						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -368,7 +299,6 @@
 				33CC10EC2044A3C60003C045 /* Runner */,
 				331C80D4294CF70F00263BE5 /* RunnerTests */,
 				33CC111A2044C6BA0003C045 /* Flutter Assemble */,
-				D8C1C6039236F521F1309CDB /* PacketTunnel */,
 			);
 		};
 /* End PBXProject section */
@@ -381,25 +311,58 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-			33CC10EB2044A3C60003C045 /* Resources */ = {
-				isa = PBXResourcesBuildPhase;
-				buildActionMask = 2147483647;
-				files = (
-					9A7E0001294D000100000018 /* assets in Resources */,
-					33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */,
-				);
-				runOnlyForDeploymentPostprocessing = 0;
-		};
-		6B34FECF67FAB9BC310F67E5 /* Resources */ = {
+		33CC10EB2044A3C60003C045 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				33CC10F32044A3C60003C045 /* Assets.xcassets in Resources */,
+				33CC10F62044A3C60003C045 /* MainMenu.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		208ACB29C2094743FCA4372C /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-Runner-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		3399D490228B24CF009A79C7 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "echo \"$PRODUCT_NAME.app\" > \"$PROJECT_DIR\"/Flutter/ephemeral/.app_filename && \"$FLUTTER_ROOT\"/packages/flutter_tools/bin/macos_assemble.sh embed\n";
+		};
 		33CC111E2044C6BF0003C045 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -420,6 +383,45 @@
 			shellPath = /bin/sh;
 			shellScript = "\"$FLUTTER_ROOT\"/packages/flutter_tools/bin/macos_assemble.sh && touch Flutter/ephemeral/tripwire";
 		};
+		5587E7C50D42615E722696FB /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-RunnerTests-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		AE64E0050EB9F37BE3B99076 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -435,24 +437,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9A7E0001294D000100000011 /* NativeAppState.swift in Sources */,
-				9A7E0001294D000100000012 /* NativeRootView.swift in Sources */,
-				9A7E0001294D000100000013 /* NativeCore.swift in Sources */,
-				9A7E0001294D000100000014 /* NativeStorage.swift in Sources */,
-				9A7E0001294D000100000015 /* NativeMacosSystemProxyManager.swift in Sources */,
-				9A7E0001294D000100000016 /* NativeRuntime.swift in Sources */,
-				9A7E0001294D000100000019 /* NativeRuntimeAssets.swift in Sources */,
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
-				CB1491F4F1A4BE670E838156 /* NativePacketTunnelService.swift in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		6E9F7B8D9BBF0C04815B9574 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				9097B47897D6B30ADD27A811 /* PacketTunnelProvider.swift in Sources */,
+				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -464,11 +451,10 @@
 			target = 33CC10EC2044A3C60003C045 /* Runner */;
 			targetProxy = 331C80D9294CF71000263BE5 /* PBXContainerItemProxy */;
 		};
-		4970A86F500ABAA3C782978C /* PBXTargetDependency */ = {
+		33CC11202044C79F0003C045 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			name = PacketTunnel;
-			target = D8C1C6039236F521F1309CDB /* PacketTunnel */;
-			targetProxy = E6BEDC6F702DD6BD965A9463 /* PBXContainerItemProxy */;
+			target = 33CC111A2044C6BA0003C045 /* Flutter Assemble */;
+			targetProxy = 33CC111F2044C79F0003C045 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -487,6 +473,7 @@
 /* Begin XCBuildConfiguration section */
 		331C80DB294CF71000263BE5 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 6BB620B30EE1A3D569187F78 /* Pods-RunnerTests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CURRENT_PROJECT_VERSION = 1;
@@ -501,6 +488,7 @@
 		};
 		331C80DC294CF71000263BE5 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 49DC479AE6DBE3A6E1680884 /* Pods-RunnerTests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CURRENT_PROJECT_VERSION = 1;
@@ -515,6 +503,7 @@
 		};
 		331C80DD294CF71000263BE5 /* Profile */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3BBDC03E4D3E0B58C997C191 /* Pods-RunnerTests.profile.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CURRENT_PROJECT_VERSION = 1;
@@ -568,7 +557,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -650,7 +639,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
@@ -700,7 +689,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MACOSX_DEPLOYMENT_TARGET = 10.15;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -732,13 +721,11 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 33E5194F232828860026EE4D /* AppInfo.xcconfig */;
 			buildSettings = {
-				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Release.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -762,89 +749,6 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-			};
-			name = Release;
-		};
-			3CEA2896657ED1BD9B1D2A09 /* Debug */ = {
-				isa = XCBuildConfiguration;
-				baseConfigurationReference = 33E5194F232828860026EE4D /* AppInfo.xcconfig */;
-				buildSettings = {
-					APPLICATION_EXTENSION_API_ONLY = YES;
-					CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
-					CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = PacketTunnel/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../../Frameworks",
-					"@executable_path/../Frameworks",
-				);
-					MACOSX_DEPLOYMENT_TARGET = 12.0;
-					MARKETING_VERSION = 1.0;
-					PRODUCT_BUNDLE_IDENTIFIER = "$(PACKET_TUNNEL_BUNDLE_IDENTIFIER)";
-					PRODUCT_BUNDLE_PACKAGE_TYPE = "XPC!";
-					PRODUCT_NAME = "$(TARGET_NAME)";
-					SDKROOT = macosx;
-					SKIP_INSTALL = YES;
-					SWIFT_VERSION = 5.0;
-				};
-				name = Debug;
-			};
-			8C3F69ADE4721DE8A753A96E /* Profile */ = {
-				isa = XCBuildConfiguration;
-				baseConfigurationReference = 33E5194F232828860026EE4D /* AppInfo.xcconfig */;
-				buildSettings = {
-					APPLICATION_EXTENSION_API_ONLY = YES;
-					CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
-					CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = PacketTunnel/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../../Frameworks",
-					"@executable_path/../Frameworks",
-				);
-					MACOSX_DEPLOYMENT_TARGET = 12.0;
-					MARKETING_VERSION = 1.0;
-					PRODUCT_BUNDLE_IDENTIFIER = "$(PACKET_TUNNEL_BUNDLE_IDENTIFIER)";
-					PRODUCT_BUNDLE_PACKAGE_TYPE = "XPC!";
-					PRODUCT_NAME = "$(TARGET_NAME)";
-					SDKROOT = macosx;
-					SKIP_INSTALL = YES;
-					SWIFT_VERSION = 5.0;
-				};
-				name = Profile;
-			};
-			D1A08095375E3FB7FD5715B2 /* Release */ = {
-				isa = XCBuildConfiguration;
-				baseConfigurationReference = 33E5194F232828860026EE4D /* AppInfo.xcconfig */;
-				buildSettings = {
-					ARCHS = arm64;
-					APPLICATION_EXTENSION_API_ONLY = YES;
-					CODE_SIGN_ENTITLEMENTS = PacketTunnel/PacketTunnel.entitlements;
-					CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_APP_SANDBOX = YES;
-				ENABLE_HARDENED_RUNTIME = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = PacketTunnel/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../../Frameworks",
-					"@executable_path/../Frameworks",
-				);
-					MACOSX_DEPLOYMENT_TARGET = 12.0;
-					MARKETING_VERSION = 1.0;
-					PRODUCT_BUNDLE_IDENTIFIER = "$(PACKET_TUNNEL_BUNDLE_IDENTIFIER)";
-					PRODUCT_BUNDLE_PACKAGE_TYPE = "XPC!";
-					PRODUCT_NAME = "$(TARGET_NAME)";
-					SDKROOT = macosx;
-					SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
@@ -887,16 +791,6 @@
 				33CC111C2044C6BA0003C045 /* Debug */,
 				33CC111D2044C6BA0003C045 /* Release */,
 				338D0CEB231458BD00FA5F75 /* Profile */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		B199D18F4CC40480767F0B34 /* Build configuration list for PBXNativeTarget "PacketTunnel" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				D1A08095375E3FB7FD5715B2 /* Release */,
-				3CEA2896657ED1BD9B1D2A09 /* Debug */,
-				8C3F69ADE4721DE8A753A96E /* Profile */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

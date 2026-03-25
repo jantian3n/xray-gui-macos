@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'dart:convert';
 
+import 'package:path/path.dart' as path;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/routing_preset.dart';
@@ -107,35 +109,17 @@ class SessionDraftStore {
     final String? snapshotJson = preferences.getString(_snapshotKey);
 
     if (snapshotJson != null && snapshotJson.trim().isNotEmpty) {
-      try {
-        final Map<String, dynamic> json = Map<String, dynamic>.from(
-          jsonDecode(snapshotJson) as Map<dynamic, dynamic>,
-        );
-        final List<dynamic> rawNodes =
-            json['nodes'] as List<dynamic>? ?? <dynamic>[];
-        final List<StoredNodeDraft> nodes = rawNodes
-            .map(
-              (dynamic item) => StoredNodeDraft.fromJson(
-                Map<String, dynamic>.from(item as Map<dynamic, dynamic>),
-              ),
-            )
-            .where((StoredNodeDraft node) =>
-                node.id.isNotEmpty &&
-                node.node.address.trim().isNotEmpty &&
-                node.node.id.trim().isNotEmpty)
-            .toList();
-
-        final String? selectedNodeId = json['selectedNodeId'] as String?;
-        return StoredNodeCollection(
-          nodes: nodes,
-          selectedNodeId:
-              nodes.any((StoredNodeDraft node) => node.id == selectedNodeId)
-                  ? selectedNodeId
-                  : (nodes.isNotEmpty ? nodes.first.id : null),
-        );
-      } catch (_) {
-        await preferences.remove(_snapshotKey);
+      final StoredNodeCollection? decoded = _decodeSnapshot(snapshotJson);
+      if (decoded != null) {
+        return decoded;
       }
+      await preferences.remove(_snapshotKey);
+    }
+
+    final StoredNodeCollection? migratedSandboxSnapshot =
+        await _migrateMacOSSandboxSnapshot(preferences);
+    if (migratedSandboxSnapshot != null) {
+      return migratedSandboxSnapshot;
     }
 
     final StoredNodeCollection? migrated =
@@ -145,6 +129,128 @@ class SessionDraftStore {
           nodes: <StoredNodeDraft>[],
           selectedNodeId: null,
         );
+  }
+
+  StoredNodeCollection? _decodeSnapshot(String snapshotJson) {
+    try {
+      final Map<String, dynamic> json = Map<String, dynamic>.from(
+        jsonDecode(snapshotJson) as Map<dynamic, dynamic>,
+      );
+      final List<dynamic> rawNodes =
+          json['nodes'] as List<dynamic>? ?? <dynamic>[];
+      final List<StoredNodeDraft> nodes = rawNodes
+          .map(
+            (dynamic item) => StoredNodeDraft.fromJson(
+              Map<String, dynamic>.from(item as Map<dynamic, dynamic>),
+            ),
+          )
+          .where((StoredNodeDraft node) =>
+              node.id.isNotEmpty &&
+              node.node.address.trim().isNotEmpty &&
+              node.node.id.trim().isNotEmpty)
+          .toList();
+
+      final String? selectedNodeId = json['selectedNodeId'] as String?;
+      return StoredNodeCollection(
+        nodes: nodes,
+        selectedNodeId:
+            nodes.any((StoredNodeDraft node) => node.id == selectedNodeId)
+                ? selectedNodeId
+                : (nodes.isNotEmpty ? nodes.first.id : null),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<StoredNodeCollection?> _migrateMacOSSandboxSnapshot(
+    SharedPreferences preferences,
+  ) async {
+    if (!Platform.isMacOS) {
+      return null;
+    }
+
+    final String? bundleId = await _readMacBundleIdentifier();
+    final String? homeDirectory = Platform.environment['HOME'];
+    if (bundleId == null || bundleId.isEmpty || homeDirectory == null) {
+      return null;
+    }
+
+    final File sandboxPreferencesFile = File(
+      path.join(
+        homeDirectory,
+        'Library',
+        'Containers',
+        bundleId,
+        'Data',
+        'Library',
+        'Preferences',
+        '$bundleId.plist',
+      ),
+    );
+    if (!await sandboxPreferencesFile.exists()) {
+      return null;
+    }
+
+    final ProcessResult result = await Process.run(
+      '/usr/bin/plutil',
+      <String>[
+        '-extract',
+        'flutter.$_snapshotKey',
+        'raw',
+        '-o',
+        '-',
+        sandboxPreferencesFile.path,
+      ],
+    );
+    if (result.exitCode != 0) {
+      return null;
+    }
+
+    final String snapshotJson = '${result.stdout}'.trim();
+    if (snapshotJson.isEmpty) {
+      return null;
+    }
+
+    final StoredNodeCollection? decoded = _decodeSnapshot(snapshotJson);
+    if (decoded == null) {
+      return null;
+    }
+
+    await preferences.setString(_snapshotKey, snapshotJson);
+    return decoded;
+  }
+
+  Future<String?> _readMacBundleIdentifier() async {
+    try {
+      final File executable = File(Platform.resolvedExecutable);
+      final File infoPlist = File(
+        path.join(executable.parent.parent.path, 'Info.plist'),
+      );
+      if (!await infoPlist.exists()) {
+        return null;
+      }
+
+      final ProcessResult result = await Process.run(
+        '/usr/bin/plutil',
+        <String>[
+          '-extract',
+          'CFBundleIdentifier',
+          'raw',
+          '-o',
+          '-',
+          infoPlist.path,
+        ],
+      );
+      if (result.exitCode != 0) {
+        return null;
+      }
+
+      final String bundleId = '${result.stdout}'.trim();
+      return bundleId.isEmpty ? null : bundleId;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> save(StoredNodeCollection collection) async {
