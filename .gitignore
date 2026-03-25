@@ -17,3 +17,5 @@ android/local.properties
 ios/Pods/
 ios/.symlinks/
 macos/Pods/
+native/.build/
+native/dist/
